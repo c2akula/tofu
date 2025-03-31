@@ -36,10 +36,7 @@ Suite *make_type_suite(void);
 Suite *make_tensor_suite(void);
 /* end of normal declarations */
 
-#ifdef TL_CUDA
-Suite *make_util_cuda_suite(void);
-Suite *make_tensor_cuda_suite(void);
-#endif /* TL_CUDA */
+/* CUDA support removed */
 
 #ifdef __cplusplus
 }

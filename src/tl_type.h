@@ -170,50 +170,6 @@ static inline void tl_pointer_assign(void *pd, ptrdiff_t offd, void *ps, ptrdiff
 TL_CPPEND
 #endif
 
-#ifdef TL_CUDA
-#ifdef __cplusplus
-TL_CPPSTART
-#endif
-
-static inline void tl_passign_h2d(void *pd, ptrdiff_t offd, void *ps, ptrdiff_t offs, size_t dsize)
-{
-    tl_memcpy_h2d(tl_padd((pd), (offd), (dsize)), tl_padd((ps), (offs), (dsize)), (dsize));
-}
-
-static inline void tl_passign_d2h(void *pd, ptrdiff_t offd, void *ps, ptrdiff_t offs, size_t dsize)
-{
-    tl_memcpy_d2h(tl_padd((pd), (offd), (dsize)), tl_padd((ps), (offs), (dsize)), (dsize));
-}
-
-static inline void tl_passign_d2d(void *pd, ptrdiff_t offd, void *ps, ptrdiff_t offs, size_t dsize)
-{
-    tl_memcpy_d2d(tl_padd((pd), (offd), (dsize)), tl_padd((ps), (offs), (dsize)), (dsize));
-}
-
-static inline void tl_pointer_assign_h2d(void *pd, ptrdiff_t offd, void *ps, ptrdiff_t offs,
-                                         tl_dtype dtype)
-{
-    tl_passign_h2d((pd), (offd), (ps), (offs), tl_size_of(dtype));
-}
-
-static inline void tl_pointer_assign_d2h(void *pd, ptrdiff_t offd, void *ps, ptrdiff_t offs,
-                                         tl_dtype dtype)
-{
-    tl_passign_d2h((pd), (offd), (ps), (offs), tl_size_of(dtype));
-}
-
-static inline void tl_pointer_assign_d2d(void *pd, ptrdiff_t offd, void *ps, ptrdiff_t offs,
-                                         tl_dtype dtype)
-{
-    tl_passign_d2d((pd), (offd), (ps), (offs), tl_size_of(dtype));
-}
-
-int tl_fprintf_cuda(FILE *fp, const char *fmt, void *p, tl_dtype dtype);
-
-#ifdef __cplusplus
-TL_CPPEND
-#endif
-
-#endif /* TL_CUDA */
+/* CUDA support removed */
 
 #endif /* _TL_TYPE_H_ */

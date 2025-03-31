@@ -53,29 +53,7 @@ void tl_err_exit(int error, const char *fmt, ...);
 void tl_err_sys(const char *fmt, ...);
 void tl_err_dump(const char *fmt, ...);
 
-#ifdef TL_CUDA
-
-#define TL_MAX_CUDA_DEVICE 15
-
-void tl_cuda_set_device(int n);
-int tl_cuda_get_device();
-int tl_is_device_mem(const void *ptr);
-void *tl_alloc_cuda(size_t size);
-void tl_memset_cuda(void *dst, int c, size_t n);
-void tl_memcpy_h2d(void *dst, const void *src, size_t size);
-void tl_memcpy_d2h(void *dst, const void *src, size_t size);
-void tl_memcpy_d2d(void *dst, const void *src, size_t size);
-void tl_free_cuda(void *p);
-void *tl_clone_h2d(const void *src, size_t size);
-void *tl_clone_d2h(const void *src, size_t size);
-void *tl_clone_d2d(const void *src, size_t size);
-void *tl_repeat_h2d(void *data, size_t size, int times);
-void *tl_repeat_d2h(void *data, size_t size, int times);
-void *tl_repeat_d2d(void *data, size_t size, int times);
-void tl_cuda_device_sync(void);
-void tl_cuda_print_last_error(void);
-
-#endif /* TL_CUDA */
+/* CUDA support removed */
 
 #ifdef __cplusplus
 TL_CPPEND
