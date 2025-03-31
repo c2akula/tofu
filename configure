@@ -39,9 +39,9 @@ my @options =
      [ "install-dir", "INSTALL_DIR", "DIR", "/usr/local", "installation directory" ],
      [ "prefix", "INSTALL_DIR", "DIR", "/usr/local", "same as --install-dir; who comes later counts" ],
      [ "pkgconfig-dir", "PKGCONFIG_DIR", "DIR", '$(INSTALL_DIR)/lib/pkgconfig', "pkgconfig directory" ],
-     [ "with-cuda", "WITH_CUDA", "BOOL", "no", "set to yes if build with CUDA"],
-     [ "cuda-install-dir", "CUDA_INSTALL_DIR", "DIR", "/usr/local/cuda", "cuda installation directory"],
      [ "debug", "DEBUG", "BOOL", "no", "set to yes when debugging" ],
+     [ "esp32", "ESP32", "BOOL", "no", "set to yes to cross-compile for ESP32" ],
+     [ "esp32-toolchain-dir", "ESP32_TOOLCHAIN_DIR", "DIR", "", "directory containing ESP32 toolchain (containing bin/xtensa-esp32-elf-gcc)" ],
     );
 
 # parse configure options

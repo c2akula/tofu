@@ -95,12 +95,12 @@ sub set_module_files {
         push @srcs, "\$(wildcard *.c)";
         push @srcs, "\$(wildcard *.cc)";
         push @srcs, "\$(wildcard *.cpp)";
-        push @srcs, "\$(wildcard *.cu)";
+        # CUDA support removed
     } else {
         push @srcs, "\$(wildcard *.c) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.c))";
         push @srcs, "\$(wildcard *.cc) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.cc))";
         push @srcs, "\$(wildcard *.cpp) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.cpp))";
-        push @srcs, "\$(wildcard *.cu) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.cu))";
+        # CUDA support removed
     }
     my $files = "${module_name}_FILES";
     my $dep_files = "${module_name}_DEP_FILES";
@@ -112,9 +112,28 @@ sub common_checks {
     my ($opts) = @_;
 
     my $output;
-    $output = `gcc --version`;
-    if (!defined $output or $output eq "") {
-        err_exit("gcc is not installed");
+    
+    if ($opts->{ESP32} eq "yes") {
+        # For ESP32 cross-compilation, check for the ESP32 toolchain
+        my $esp32_gcc;
+        if ($opts->{ESP32_TOOLCHAIN_DIR} && $opts->{ESP32_TOOLCHAIN_DIR} ne "") {
+            $esp32_gcc = "$opts->{ESP32_TOOLCHAIN_DIR}/bin/xtensa-esp32-elf-gcc";
+        } else {
+            $esp32_gcc = "xtensa-esp32-elf-gcc";
+        }
+        
+        $output = `$esp32_gcc --version 2>&1`;
+        if (!defined $output or $output eq "") {
+            err_exit("ESP32 toolchain is not installed or not in PATH. Please install ESP-IDF or specify ESP32 toolchain directory with --esp32-toolchain-dir");
+        }
+        
+        print("Found ESP32 toolchain: $output\n");
+    } else {
+        # Regular build checks
+        $output = `gcc --version`;
+        if (!defined $output or $output eq "") {
+            err_exit("gcc is not installed");
+        }
     }
 
     $output = `make --version`;;
@@ -122,37 +141,17 @@ sub common_checks {
         err_exit("make is not installed");
     }
 
-    $output = `pkg-config --version`;;
-    if (!defined $output or $output eq "") {
-        err_exit("pkg-config is not installed");
-    }
-
-    if ($opts->{WITH_CUDNN} eq "yes") {
-        if (not $opts->{WITH_CUDA} eq "yes") {
-            $opts->{WITH_CUDA} = "yes";
-            print ("automatically set --with-cuda=yes\n");
-        }
-    }
-
-    if ($opts->{WITH_TENSORRT} eq "yes") {
-        if (not $opts->{WITH_CUDA} eq "yes") {
-            $opts->{WITH_CUDA} = "yes";
-            print ("automatically set --with-cuda=yes\n");
-        }
-        if (not $opts->{WITH_CUDNN} eq "yes") {
-            $opts->{WITH_CUDNN} = "yes";
-            print ("automatically set --with-cudnn=yes\n");
-        }
-    }
-
-    if ($opts->{WITH_CUDA} eq "yes") {
-        $output = `nvcc --version`;;
+    # Only check for pkg-config if not cross-compiling for ESP32
+    if ($opts->{ESP32} ne "yes") {
+        $output = `pkg-config --version`;;
         if (!defined $output or $output eq "") {
-            err_exit("nvcc is not installed");
+            err_exit("pkg-config is not installed");
         }
     }
 
-    if ($opts->{WITH_PYTHON} eq "yes") {
+    # CUDA/CUDNN/TensorRT support removed
+
+    if ($opts->{WITH_PYTHON} eq "yes" && $opts->{ESP32} ne "yes") {
         $output = `$opts->{PYTHON_CMD} --version 2>&1`;
         if (not defined $output or $output eq "" or
             not version_roughly_match($output, $opts->{PYTHON_VERSION})) {
@@ -164,7 +163,6 @@ sub common_checks {
             }
         }
     }
-
 }
 
 sub config_to_str {

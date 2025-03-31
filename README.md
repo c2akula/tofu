@@ -1,5 +1,5 @@
 # TensorLight
-TensorLight is a light-weight tensor operation library for C and CUDA.
+TensorLight is a light-weight tensor operation library for C.
 
 ## Prerequisites
 The following steps have been tested for Ubuntu 16.04 but should work with
@@ -10,9 +10,22 @@ Required packages can be installed using the following command:
 sudo apt-get install build-essential perl git pkg-config check
 ```
 
-If you want to build with CUDA support, you also have to install CUDA 8.0
-or later according to their website [CUDA Toolkit 8.0](https://developer.nvidia.com/cuda-80-ga2-download-archive).
-Remember to put `nvcc` (usually in `/usr/local/cuda/bin`) in environment variable `PATH`.
+### ESP32 Cross-Compilation
+To cross-compile for ESP32, you need the ESP32 toolchain installed. You can install it by:
+
+1. Installing ESP-IDF: Follow the instructions at [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html)
+2. Ensuring the ESP32 toolchain is in your PATH or specify its directory with the `--esp32-toolchain-dir` option
+
+### Docker Testing Environment
+For consistent testing across different environments, you can use the provided Docker setup:
+
+1. Make sure you have Docker installed on your system
+2. Run the provided script to build and test in a Docker container:
+   ```
+   ./run-tests-docker.sh
+   ```
+
+This will create an Ubuntu 22.04 container with all required dependencies and run the tests inside it. See the [Docker documentation](docker/README.md) for more information.
 
 ## Building and Installation
 1.  Clone this repository to your local directory.
@@ -31,13 +44,19 @@ Remember to put `nvcc` (usually in `/usr/local/cuda/bin`) in environment variabl
     chmod +x configure
     ./configure
     ```
-    There are options to custom your building and installation process.
-    You can append them after `./configure`. For example, use
+    There are options to customize your building and installation process.
+    You can append them after `./configure`. 
     
+    For cross-compiling for ESP32:
     ```
-    ./configure --with-cuda=yes
+    ./configure --esp32=yes
     ```
-    if you want to build with CUDA support.
+    
+    Or if your ESP32 toolchain is not in your PATH:
+    ```
+    ./configure --esp32=yes --esp32-toolchain-dir=/path/to/esp-idf/tools/xtensa-esp32-elf
+    ```
+    
     Detailed `./configure` options can be printed using `./configure -h`.
 
     After that, use `make` to compile the library and run the tests. Then `make install`

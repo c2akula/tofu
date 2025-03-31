@@ -14,11 +14,11 @@ MOD_NAME is the module name.
 TEST_NAME is the test name, usually the name of function to be tested.
 
 Example:
-	tools/addtest.pl -c TL_CUDA . mod mod_func1 mod_func2
+	tools/addtest.pl -c TL_DEBUG . mod mod_func1 mod_func2
 
 	Executing this example from project root will generate test templates
 	test_tl_mod_func1 and test_tl_mod_func2 for module tl_mod in file
- 	ROOT/test/test_tl_mod.c, and will be compiled only if TL_CUDA has been
+ 	ROOT/test/test_tl_mod.c, and will be compiled only if TL_DEBUG has been
 	defined.
 EOF
 if (@ARGV < 1 or $ARGV[0] eq "-h" or $ARGV[0] eq "--help") {

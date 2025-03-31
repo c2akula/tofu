@@ -90,6 +90,10 @@ int ln_test_run_tests(const char *filter)
     srunner_free(sr);
     ln_test_record_free(filtered_record);
 
+#ifdef __APPLE__
+    // Skip XML formatting on macOS
+    printf("Skipping XML formatting on macOS\n");
+#else
     exec_cmd("sed -i 's,http://check.sourceforge.net/xml/check_unittest.xslt,#style,g' "
              LN_BUILD_TEST_DIR"/result/check_output.xml");
     exec_cmd("sed -i '3i\\<doc>' "LN_BUILD_TEST_DIR"/result/check_output.xml");
@@ -99,6 +103,7 @@ int ln_test_run_tests(const char *filter)
     exec_cmd("sed -i 's,<xsl:stylesheet,<xsl:stylesheet id=\"style\",g' "
              LN_BUILD_TEST_DIR"/result/check_output.xml");
     exec_cmd("echo '</style></doc>' >> "LN_BUILD_TEST_DIR"/result/check_output.xml");
+#endif
 
     return num_failed;
 }
