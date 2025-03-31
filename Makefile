@@ -42,9 +42,6 @@ CONFIG_DEFINES =
 CONFIG_DEFINES += "$(ABBR)_MAJOR_VERSION ($(MAJOR))"
 CONFIG_DEFINES += "$(ABBR)_MINOR_VERSION ($(MINOR))"
 CONFIG_DEFINES += "$(ABBR)_MICRO_VERSION ($(MICRO))"
-ifeq ($(WITH_CUDA), yes)
-CONFIG_DEFINES += "$(ABBR)_CUDA"
-endif
 
 define make-build-dir
 $(AT)if [ ! -d $(BUILD_DIR) ]; then mkdir -p $(BUILD_DIR); fi
@@ -70,17 +67,21 @@ endef
 define make-lib
 $(AT)cp $(EXPORT_HEADERS) $(BUILD_INCLUDE_DIR)
 $(AT)cp $(OBJ_A) $(BUILD_A)
-$(AT)cp $(OBJ_SO) $(BUILD_SO_MMM)
-$(AT)ln -sf $(LIBTARGET_SO_MMM) $(BUILD_SO_MM)
-$(AT)ln -sf $(LIBTARGET_SO_MMM) $(BUILD_SO)
+$(AT)if [ "$(ESP32)" != "yes" ]; then \
+    cp $(OBJ_SO) $(BUILD_SO_MMM); \
+    ln -sf $(LIBTARGET_SO_MMM) $(BUILD_SO_MM); \
+    ln -sf $(LIBTARGET_SO_MMM) $(BUILD_SO); \
+fi
 endef
 
 define make-install
 cp -r $(BUILD_INCLUDE_DIR)/* $(INSTALL_INCLUDE_DIR)
 cp $(BUILD_A) $(INSTALL_A)
-cp $(BUILD_SO_MMM) $(INSTALL_SO_MMM)
-ln -sf $(LIBTARGET_SO_MMM) $(INSTALL_SO_MM)
-ln -sf $(LIBTARGET_SO_MMM) $(INSTALL_SO)
+if [ "$(ESP32)" != "yes" ]; then \
+	cp $(BUILD_SO_MMM) $(INSTALL_SO_MMM); \
+	ln -sf $(LIBTARGET_SO_MMM) $(INSTALL_SO_MM); \
+	ln -sf $(LIBTARGET_SO_MMM) $(INSTALL_SO); \
+fi
 $(INSTALL_DOC_CMD)
 perl $(BUILDTOOLS_DIR)/gen_pkgconfig.pl $(TARGET) $(INSTALL_DIR) $(MAJOR).$(MINOR).$(MICRO) $(PKGCONFIG_DIR) "$(REQUIRES)" "A light-weight neural network compiler for different software/hardware backends."
 $(INSTALL_PYTHON)
@@ -118,8 +119,14 @@ lib:
 	$(AT)$(MAKE) -C $(SRC_DIR) lib
 	$(call make-lib)
 
+# Skip tests when cross-compiling for ESP32
+ifeq ($(ESP32), yes)
+test: lib
+	$(ECHO) "Skipping tests when cross-compiling for ESP32"
+else
 test: lib
 	$(AT)$(MAKE) -C $(TEST_DIR) all
+endif
 
 cmd:
 	$(call make-build-dir)

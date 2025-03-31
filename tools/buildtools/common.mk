@@ -2,13 +2,13 @@
 ifeq ($(ESP32), yes)
   ifeq ($(ESP32_TOOLCHAIN_DIR),)
     # No toolchain dir specified, use tools from PATH
-    CC ?= xtensa-esp32-elf-gcc
-    CXX ?= xtensa-esp32-elf-g++
+    CC = xtensa-esp32-elf-gcc
+    CXX = xtensa-esp32-elf-g++
     AR = xtensa-esp32-elf-ar cr
   else
     # Use toolchain from specified directory
-    CC ?= $(ESP32_TOOLCHAIN_DIR)/bin/xtensa-esp32-elf-gcc
-    CXX ?= $(ESP32_TOOLCHAIN_DIR)/bin/xtensa-esp32-elf-g++
+    CC = $(ESP32_TOOLCHAIN_DIR)/bin/xtensa-esp32-elf-gcc
+    CXX = $(ESP32_TOOLCHAIN_DIR)/bin/xtensa-esp32-elf-g++
     AR = $(ESP32_TOOLCHAIN_DIR)/bin/xtensa-esp32-elf-ar cr
   endif
 else

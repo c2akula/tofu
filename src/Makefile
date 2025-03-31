@@ -16,7 +16,12 @@ all: bin lib
 
 bin: $(OBJDIR)/$(BIN)
 
+# For ESP32, only build static library
+ifeq ($(ESP32), yes)
+lib: liba
+else
 lib: liba libso
+endif
 
 liba: $(OBJDIR)/$(LIBTARGET_A)
 
