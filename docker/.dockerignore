@@ -1,0 +1,22 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+build/
+*.o
+*.so
+*.a
+*.d
+
+# IDE files
+.vscode/
+.idea/
+
+# Docker files (no need to include these in the build)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Other
+.DS_Store
