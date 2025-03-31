@@ -56,6 +56,8 @@ TL_EXPORT int tl_tensor_issameshape(const tl_tensor *t1, const tl_tensor *t2)
     return 0;
 }
 
+/* Implementation moved to tl_tensor_broadcast.c */
+
 TL_EXPORT tl_tensor *tl_tensor_create(void *data, int ndim, const int *dims, tl_dtype dtype)
 {
     tl_tensor *t;

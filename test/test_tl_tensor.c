@@ -25,6 +25,7 @@
 #include "tl_tensor.h"
 #include "tl_util.h"
 #include "tl_check.h"
+#include "tl_type.h"
 
 #define ARR(type, varg...) (type[]){varg}
 
@@ -759,6 +760,135 @@ LN_TEST_START(test_tl_tensor_submean)
     tl_tensor_free(true_tensor);
 }
 LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_isbroadcastable)
+{
+    tl_tensor *t1, *t2, *t3, *t4, *t5;
+    
+    // Same shape tensors should be broadcastable
+    t1 = tl_tensor_zeros(2, (int[]){3, 3}, TL_FLOAT);
+    t2 = tl_tensor_zeros(2, (int[]){3, 3}, TL_FLOAT);
+    ck_assert_int_eq(tl_tensor_isbroadcastable(t1, t2), 1);
+    
+    // Scalar to array broadcasting
+    t3 = tl_tensor_zeros(1, (int[]){1}, TL_FLOAT);
+    ck_assert_int_eq(tl_tensor_isbroadcastable(t3, t1), 1);
+    ck_assert_int_eq(tl_tensor_isbroadcastable(t1, t3), 1);
+    
+    // Broadcasting along a dimension
+    t4 = tl_tensor_zeros(2, (int[]){1, 3}, TL_FLOAT);
+    ck_assert_int_eq(tl_tensor_isbroadcastable(t4, t1), 1);
+    ck_assert_int_eq(tl_tensor_isbroadcastable(t1, t4), 1);
+    
+    // Non-broadcastable dimensions
+    t5 = tl_tensor_zeros(2, (int[]){2, 4}, TL_FLOAT);
+    ck_assert_int_eq(tl_tensor_isbroadcastable(t5, t1), 0);
+    
+    tl_tensor_free_data_too(t1);
+    tl_tensor_free_data_too(t2);
+    tl_tensor_free_data_too(t3);
+    tl_tensor_free_data_too(t4);
+    tl_tensor_free_data_too(t5);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_broadcast_to)
+{
+    tl_tensor *src, *dst, *expected;
+    float src_data[] = {1, 2, 3};
+    float expected_data[] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
+    
+    // Create a 1D tensor with shape [3]
+    src = tl_tensor_create(src_data, 1, (int[]){3}, TL_FLOAT);
+    
+    // Broadcast to shape [4, 3]
+    dst = tl_tensor_broadcast_to(src, NULL, 2, (int[]){4, 3});
+    
+    // Create expected tensor
+    expected = tl_tensor_create(expected_data, 2, (int[]){4, 3}, TL_FLOAT);
+    
+    // Verify results
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 4);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 12);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test with a scalar (1x1 tensor)
+    float scalar_val = 5.0f;
+    src = tl_tensor_create(&scalar_val, 1, (int[]){1}, TL_FLOAT);
+    
+    // Broadcast scalar to 2x3 tensor
+    float scalar_expected[] = {5.0f, 5.0f, 5.0f, 5.0f, 5.0f, 5.0f};
+    dst = tl_tensor_broadcast_to(src, NULL, 2, (int[]){2, 3});
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, scalar_expected, dst->len, 0);
+    
+    tl_tensor_free(src);
+    tl_tensor_free_data_too(dst);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_elew_broadcast)
+{
+    tl_tensor *src1, *src2, *dst, *expected;
+    
+    // Test case 1: Scalar * Matrix
+    float scalar_val = 2.0f;
+    float matrix_data[] = {1, 2, 3, 4, 5, 6};
+    float expected_data[] = {2, 4, 6, 8, 10, 12};
+    
+    src1 = tl_tensor_create(&scalar_val, 1, (int[]){1}, TL_FLOAT);
+    src2 = tl_tensor_create(matrix_data, 2, (int[]){2, 3}, TL_FLOAT);
+    expected = tl_tensor_create(expected_data, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    dst = tl_tensor_elew_broadcast(src1, src2, NULL, TL_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test case 2: Row + Matrix (broadcasting row across all rows)
+    float row_data[] = {10, 20, 30};
+    float matrix2_data[] = {1, 2, 3, 4, 5, 6};
+    float expected2_data[] = {11, 22, 33, 14, 25, 36};
+    
+    src1 = tl_tensor_create(row_data, 1, (int[]){3}, TL_FLOAT);
+    src2 = tl_tensor_create(matrix2_data, 2, (int[]){2, 3}, TL_FLOAT);
+    expected = tl_tensor_create(expected2_data, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    dst = tl_tensor_elew_broadcast(src1, src2, NULL, TL_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected2_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+}
+LN_TEST_END
 /* end of tests */
 
 LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
@@ -787,6 +917,9 @@ LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
     LN_TEST_ADD_TEST(test_tl_tensor_convert);
     LN_TEST_ADD_TEST(test_tl_tensor_resize);
     LN_TEST_ADD_TEST(test_tl_tensor_submean);
+    LN_TEST_ADD_TEST(test_tl_tensor_isbroadcastable);
+    LN_TEST_ADD_TEST(test_tl_tensor_broadcast_to);
+    LN_TEST_ADD_TEST(test_tl_tensor_elew_broadcast);
 }
 LN_TEST_TCASE_END
 

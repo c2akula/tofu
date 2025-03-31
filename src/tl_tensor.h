@@ -58,6 +58,7 @@ TL_CPPSTART
 int tl_tensor_index(const tl_tensor *t, int *coords);
 void tl_tensor_coords(const tl_tensor *t, int index, int *coords);
 int tl_tensor_issameshape(const tl_tensor *t1, const tl_tensor *t2);
+int tl_tensor_isbroadcastable(const tl_tensor *t1, const tl_tensor *t2);
 tl_tensor *tl_tensor_create(void *data, int ndim, const int *dims, tl_dtype dtype);
 void tl_tensor_free(tl_tensor *t);
 void tl_tensor_free_data_too(tl_tensor *t);
@@ -90,6 +91,9 @@ tl_tensor *tl_tensor_convert(const tl_tensor *src, tl_tensor *dst, tl_dtype dtyp
 tl_tensor *tl_tensor_resize(const tl_tensor *src, tl_tensor *dst, const int *new_dims,
                             tl_resize_type rtype);
 tl_tensor *tl_tensor_submean(const tl_tensor *src, tl_tensor *dst, const double *mean);
+tl_tensor *tl_tensor_broadcast_to(const tl_tensor *src, tl_tensor *dst, int ndim, const int *dims);
+tl_tensor *tl_tensor_elew_broadcast(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst,
+                               tl_elew_op elew_op);
 
 #ifdef TL_CUDA
 

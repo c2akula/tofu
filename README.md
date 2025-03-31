@@ -1,5 +1,5 @@
 # TensorLight
-TensorLight is a light-weight tensor operation library for C.
+TensorLight is a light-weight tensor operation library for C with broadcasting support.
 
 ## Prerequisites
 The following steps have been tested for Ubuntu 16.04 but should work with
@@ -78,12 +78,50 @@ This will create an Ubuntu 22.04 container with all required dependencies and ru
 ## Usage
 Include `tl_tensor.h` in your project to use TensorLight functions.
 
-Documentation is coming soon. But it should be familiar if you have experience
-with `numpy` in Python.
-
 You can use the following command to get the compilation and linking flags when
 building your project.
 
 ```
 pkg-config --cflags --libs tensorlight
 ```
+
+## Broadcasting Support
+
+TensorLight now supports broadcasting operations similar to NumPy. Broadcasting allows you to perform operations on arrays of different shapes. The rules for broadcasting are:
+
+1. Arrays with fewer dimensions are prepended with dimensions of size 1.
+2. Size-1 dimensions are stretched to match the corresponding dimension of the other array.
+3. Arrays must be broadcastable in each dimension (they must have the same size, or one of them must have size 1).
+
+### Broadcasting API
+
+```c
+// Check if two tensors can be broadcast together
+int tl_tensor_isbroadcastable(const tl_tensor *t1, const tl_tensor *t2);
+
+// Broadcast a tensor to a new shape
+tl_tensor *tl_tensor_broadcast_to(const tl_tensor *src, tl_tensor *dst, int ndim, const int *dims);
+
+// Element-wise operation with broadcasting
+tl_tensor *tl_tensor_elew_broadcast(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst, tl_elew_op elew_op);
+```
+
+### Broadcasting Examples
+
+```c
+// Example 1: Broadcasting a scalar to a matrix
+float scalar_val = 5.0f;
+tl_tensor *scalar = tl_tensor_create(&scalar_val, 1, (int[]){1}, TL_FLOAT);
+tl_tensor *result = tl_tensor_broadcast_to(scalar, NULL, 2, (int[]){3, 4});
+// result will be a 3×4 matrix filled with 5.0
+
+// Example 2: Element-wise multiplication with broadcasting
+float arr1[] = {1, 2, 3};  // Shape: [3]
+float arr2[] = {10, 20};   // Shape: [2, 1]
+tl_tensor *t1 = tl_tensor_create(arr1, 1, (int[]){3}, TL_FLOAT);
+tl_tensor *t2 = tl_tensor_create(arr2, 2, (int[]){2, 1}, TL_FLOAT);
+tl_tensor *result = tl_tensor_elew_broadcast(t1, t2, NULL, TL_MUL);
+// result will have shape [2, 3] and values [[10, 20, 30], [20, 40, 60]]
+```
+
+Additional documentation is coming soon. But the API should be familiar if you have experience with `numpy` in Python.
