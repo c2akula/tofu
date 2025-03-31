@@ -95,47 +95,6 @@ tl_tensor *tl_tensor_broadcast_to(const tl_tensor *src, tl_tensor *dst, int ndim
 tl_tensor *tl_tensor_elew_broadcast(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst,
                                tl_elew_op elew_op);
 
-#ifdef TL_CUDA
-
-tl_tensor *tl_tensor_zeros_cuda(int ndim, const int *dims, tl_dtype dtype);
-void tl_tensor_free_data_too_cuda(tl_tensor *t);
-tl_tensor *tl_tensor_clone_h2d(const tl_tensor *src);
-tl_tensor *tl_tensor_clone_d2h(const tl_tensor *src);
-tl_tensor *tl_tensor_clone_d2d(const tl_tensor *src);
-tl_tensor *tl_tensor_repeat_h2d(const tl_tensor *src, int times);
-tl_tensor *tl_tensor_repeat_d2h(const tl_tensor *src, int times);
-tl_tensor *tl_tensor_repeat_d2d(const tl_tensor *src, int times);
-tl_tensor *tl_tensor_arange_cuda(double start, double stop, double step, tl_dtype dtype);
-void tl_tensor_rearange_cuda(tl_tensor *src, double start, double stop, double step);
-void tl_tensor_fprint_cuda(FILE *stream, const tl_tensor *t, const char *fmt);
-void tl_tensor_print_cuda(const tl_tensor *t, const char *fmt);
-int tl_tensor_save_cuda(const char *file_name, const tl_tensor *t, const char *fmt);
-tl_tensor *tl_tensor_zeros_slice_cuda(const tl_tensor *src, int axis, int len, tl_dtype dtype);
-tl_tensor *tl_tensor_slice_cuda(const tl_tensor *src, tl_tensor *dst, int axis, int start, int len);
-tl_tensor *tl_tensor_maxreduce_cuda(const tl_tensor *src, tl_tensor *dst, tl_tensor *arg, int axis);
-tl_tensor *tl_tensor_elew_cuda(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst,
-                               tl_elew_op elew_op);
-int tl_tensor_dot_product_cuda_ws_len(const tl_tensor *src);
-tl_tensor *tl_tensor_dot_product_cuda(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *ws1,
-                                      tl_tensor *ws2, tl_tensor *dst);
-tl_tensor *tl_tensor_convert_cuda(const tl_tensor *src, tl_tensor *dst, tl_dtype dtype_d);
-tl_tensor *tl_tensor_transpose_cuda(const tl_tensor *src, tl_tensor *dst, const int *axes);
-tl_tensor *tl_tensor_lrelu_cuda(const tl_tensor *src, tl_tensor *dst, float negslope);
-tl_tensor *tl_tensor_resize_cuda(const tl_tensor *src, tl_tensor *dst, const int *new_dims,
-                                 tl_resize_type rtype);
-tl_tensor *tl_tensor_submean_cuda(const tl_tensor *src, tl_tensor *dst, const double *mean);
-tl_tensor *tl_tensor_transform_bboxSQD_cuda(const tl_tensor *delta, const tl_tensor *anchor,
-                                            tl_tensor *dst, int width, int height, int img_width,
-                                            int img_height, int x_shift, int y_shift);
-void tl_tensor_sort1d_cuda(tl_tensor *key, tl_sort_dir dir);
-void tl_tensor_sort1d_by_key_cuda(tl_tensor *key, tl_tensor *val, tl_sort_dir dir);
-tl_tensor *tl_tensor_pick1d_cuda(const tl_tensor *src, const tl_tensor *index, tl_tensor *dst,
-                                 int stride, int len);
-void tl_tensor_detect_yolov3_cuda(const tl_tensor *feature, const tl_tensor *anchors,
-                                  tl_tensor *box_centers, tl_tensor *box_sizes, tl_tensor *boxes,
-                                  tl_tensor *confs, tl_tensor *probs, int img_h, int img_w);
-
-#endif /* TL_CUDA */
 
 #ifdef __cplusplus
 TL_CPPEND

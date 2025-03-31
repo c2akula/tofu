@@ -170,6 +170,5 @@ static inline void tl_pointer_assign(void *pd, ptrdiff_t offd, void *ps, ptrdiff
 TL_CPPEND
 #endif
 
-/* CUDA support removed */
 
 #endif /* _TL_TYPE_H_ */

@@ -95,12 +95,10 @@ sub set_module_files {
         push @srcs, "\$(wildcard *.c)";
         push @srcs, "\$(wildcard *.cc)";
         push @srcs, "\$(wildcard *.cpp)";
-        # CUDA support removed
     } else {
         push @srcs, "\$(wildcard *.c) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.c))";
         push @srcs, "\$(wildcard *.cc) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.cc))";
         push @srcs, "\$(wildcard *.cpp) \$(foreach dir,\$($sub_dirs),\$(wildcard \$(dir)/*.cpp))";
-        # CUDA support removed
     }
     my $files = "${module_name}_FILES";
     my $dep_files = "${module_name}_DEP_FILES";
@@ -149,7 +147,6 @@ sub common_checks {
         }
     }
 
-    # CUDA/CUDNN/TensorRT support removed
 
     if ($opts->{WITH_PYTHON} eq "yes" && $opts->{ESP32} ne "yes") {
         $output = `$opts->{PYTHON_CMD} --version 2>&1`;

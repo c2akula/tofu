@@ -63,7 +63,7 @@ CXXFLAGS += -O2
 LDFLAGS += -O2
 endif
 
-SRC = $(filter-out %cuda.c %cuda.cc %cuda.cpp %cudnn.c %cudnn.cc %cudnn.cpp %tensorrt.c %tensorrt.cc %tensorrt.cpp %dpu.c %dpu.cc %dpu.cpp %.cu, $(SRC))
+SRC = $(SRC)
 
 OBJDIR = $(BUILD_DIR)/$(notdir $(CURDIR))
 OBJS   = $(patsubst %.c,$(OBJDIR)/%.o,$(filter %.c,$(SRC)))
@@ -127,7 +127,6 @@ $(AT)$(BUILDTOOLS_DIR)/gen_compile_commands.pl -f $(CMD_FILE) `pwd` $< "$(CXX) $
 endef
 endif
 
-# CUDA support removed
 
 define ld-bin
 $(ECHO) "  LD\t" $@

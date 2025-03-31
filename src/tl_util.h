@@ -53,7 +53,6 @@ void tl_err_exit(int error, const char *fmt, ...);
 void tl_err_sys(const char *fmt, ...);
 void tl_err_dump(const char *fmt, ...);
 
-/* CUDA support removed */
 
 #ifdef __cplusplus
 TL_CPPEND
