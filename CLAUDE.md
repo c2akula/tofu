@@ -7,7 +7,7 @@
 - `make` or `make lib` - Build libraries
 - `make test` - Build and run all tests (skipped when cross-compiling for ESP32)
 - `make -C test bin` - Build tests without running
-- `cd test && ../build/test/test_tensorlight [test_name]` - Run specific test
+- `cd test && ../build/test/test_tofu [test_name]` - Run specific test
 - `make cmd` - Generate compile_commands.json for tooling
 - `make clean` - Remove build files
 - `make install` - Install to configured directory

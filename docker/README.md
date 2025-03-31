@@ -1,6 +1,6 @@
-# Docker Testing Setup for TensorLight
+# Docker Testing Setup for Tofu
 
-This directory contains Docker configuration for testing TensorLight in a controlled environment.
+This directory contains Docker configuration for testing Tofu in a controlled environment.
 
 ## Prerequisites
 

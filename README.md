@@ -1,5 +1,5 @@
-# TensorLight
-TensorLight is a light-weight tensor operation library for C with broadcasting support.
+# Tofu
+Tofu is a light-weight tensor operation library for C with broadcasting support.
 
 ## Prerequisites
 The following steps have been tested for Ubuntu 16.04 but should work with
@@ -32,8 +32,8 @@ This will create an Ubuntu 22.04 container with all required dependencies and ru
 
     ```
     cd <my_working_directory>
-    git clone https://github.com/zhaozhixu/TensorLight.git
-    cd TensorLight
+    git clone https://github.com/c2akula/tofu.git
+    cd tofu
     ```
 
 2.  Build and install
@@ -76,18 +76,18 @@ This will create an Ubuntu 22.04 container with all required dependencies and ru
     the installation directory.
 
 ## Usage
-Include `tl_tensor.h` in your project to use TensorLight functions.
+Include `tl_tensor.h` in your project to use Tofu functions.
 
 You can use the following command to get the compilation and linking flags when
 building your project.
 
 ```
-pkg-config --cflags --libs tensorlight
+pkg-config --cflags --libs tofu
 ```
 
 ## Broadcasting Support
 
-TensorLight now supports broadcasting operations similar to NumPy. Broadcasting allows you to perform operations on arrays of different shapes. The rules for broadcasting are:
+Tofu now supports broadcasting operations similar to NumPy. Broadcasting allows you to perform operations on arrays of different shapes. The rules for broadcasting are:
 
 1. Arrays with fewer dimensions are prepended with dimensions of size 1.
 2. Size-1 dimensions are stretched to match the corresponding dimension of the other array.

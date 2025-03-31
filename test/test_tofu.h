@@ -20,32 +20,25 @@
  * SOFTWARE.
  */
 
-#include "test_tofu.h"
-#include "../src/tl_util.h"
+#ifndef _TEST_TOFU_H_
+#define _TEST_TOFU_H_
 
-static void setup(void)
-{
+#include <stdio.h>
+#include <check.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+Suite *make_master_suite(void);
+Suite *make_util_suite(void);
+Suite *make_type_suite(void);
+Suite *make_tensor_suite(void);
+/* end of normal declarations */
+
+
+#ifdef __cplusplus
 }
+#endif
 
-static void teardown(void)
-{
-}
-
-/* end of tests */
-
-Suite *make_master_suite(void)
-{
-     Suite *s;
-     TCase *tc_master;
-
-     s = suite_create("master");
-     tc_master = tcase_create("master");
-     tcase_add_checked_fixture(tc_master, setup, teardown);
-
-
-     /* end of adding tests */
-
-     suite_add_tcase(s, tc_master);
-
-     return s;
-}
+#endif /* _TEST_TOFU_H_ */

@@ -16,7 +16,7 @@ my $micro = 0;
 # project specified make variables
 my %customs =
     (
-     "TARGET" => "tensorlight",
+     "TARGET" => "tofu",
      "ABBR" => "TL",
      "abbr" => "tl",
      "EXPORT_HEADERS" => "src/tl_tensor.h src/tl_check.h src/tl_type.h src/tl_util.h",
