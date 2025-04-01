@@ -1022,7 +1022,7 @@ LN_TEST_START(test_tl_tensor_elew_param_with_broadcasting)
     src = tl_tensor_create(tensor3d_data, 3, (int[]){2, 2, 2}, TL_FLOAT);
     expected = tl_tensor_create(expected3d_data, 3, (int[]){2, 2, 2}, TL_FLOAT);
     
-    dst = tl_tensor_elew_param(src, 5.0, NULL, TL_SUM);
+    dst = tl_tensor_elew_param(src, param, NULL, TL_SUM);
     
     ck_assert_int_eq(dst->ndim, 3);
     ck_assert_int_eq(dst->dims[0], 2);
@@ -1035,6 +1035,102 @@ LN_TEST_START(test_tl_tensor_elew_param_with_broadcasting)
     tl_tensor_free(src);
     tl_tensor_free_data_too(dst);
     tl_tensor_free(expected);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_broadcasting_edge_cases)
+{
+    tl_tensor *src1, *src2, *dst, *expected;
+    
+    // Test case 1: Empty dimensions (1-sized dimensions)
+    // Create a 3x1x2 tensor
+    float tensor3d_data[] = {1, 2, 3, 4, 5, 6};
+    // Create a 1x4x1 tensor
+    float tensor3d_data2[] = {10, 20, 30, 40};
+    // Expected result is 3x4x2 tensor
+    float expected_data[] = {
+        11, 12, 21, 22, 31, 32, 41, 42,  // First "sheet" (3D slice)
+        13, 14, 23, 24, 33, 34, 43, 44,  // Second sheet
+        15, 16, 25, 26, 35, 36, 45, 46   // Third sheet
+    };
+    
+    src1 = tl_tensor_create(tensor3d_data, 3, (int[]){3, 1, 2}, TL_FLOAT);
+    src2 = tl_tensor_create(tensor3d_data2, 3, (int[]){1, 4, 1}, TL_FLOAT);
+    expected = tl_tensor_create(expected_data, 3, (int[]){3, 4, 2}, TL_FLOAT);
+    
+    dst = tl_tensor_elew(src1, src2, NULL, TL_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 4);
+    ck_assert_int_eq(dst->dims[2], 2);
+    ck_assert_int_eq(dst->len, 24);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test case 2: Scalar broadcasting to different data types
+    int8_t scalar_val_i8 = 2;
+    int8_t int8_data[] = {1, 2, 3, 4};
+    int8_t expected_i8_data[] = {2, 4, 6, 8};
+    
+    src1 = tl_tensor_create(&scalar_val_i8, 1, (int[]){1}, TL_INT8);
+    src2 = tl_tensor_create(int8_data, 1, (int[]){4}, TL_INT8);
+    expected = tl_tensor_create(expected_i8_data, 1, (int[]){4}, TL_INT8);
+    
+    dst = tl_tensor_elew(src1, src2, NULL, TL_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 4);
+    ck_assert_int_eq(dst->len, 4);
+    ck_assert_int_eq(dst->dtype, TL_INT8);
+    ck_assert_array_int_eq((int8_t *)dst->data, expected_i8_data, dst->len);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test case 3: Broadcasting with a pre-allocated destination tensor
+    float src1_data[] = {1, 2, 3};
+    float src2_data[] = {10, 20};
+    // Expected result is a 2x3 tensor
+    float expected_result[] = {11, 12, 13, 21, 22, 23};
+    
+    src1 = tl_tensor_create(src1_data, 2, (int[]){1, 3}, TL_FLOAT);
+    src2 = tl_tensor_create(src2_data, 2, (int[]){2, 1}, TL_FLOAT);
+    expected = tl_tensor_create(expected_result, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    // Pre-allocate the destination tensor with the correct shape
+    dst = tl_tensor_zeros(2, (int[]){2, 3}, TL_FLOAT);
+    dst = tl_tensor_elew(src1, src2, dst, TL_SUM);
+    
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_result, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test case 4: Non-broadcastable tensors should return NULL
+    float non_bc_src1[] = {1, 2, 3};
+    float non_bc_src2[] = {4, 5}; 
+    
+    src1 = tl_tensor_create(non_bc_src1, 1, (int[]){3}, TL_FLOAT);
+    src2 = tl_tensor_create(non_bc_src2, 1, (int[]){2}, TL_FLOAT);
+    
+    // This should return NULL as dimensions 3 and 2 are incompatible
+    dst = tl_tensor_elew(src1, src2, NULL, TL_SUM);
+    ck_assert_ptr_eq(dst, NULL);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
 }
 LN_TEST_END
 /* end of tests */
@@ -1070,6 +1166,7 @@ LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
     LN_TEST_ADD_TEST(test_tl_tensor_elew_broadcast);
     LN_TEST_ADD_TEST(test_tl_tensor_elew_with_broadcasting);
     LN_TEST_ADD_TEST(test_tl_tensor_elew_param_with_broadcasting);
+    LN_TEST_ADD_TEST(test_tl_tensor_broadcasting_edge_cases);
 }
 LN_TEST_TCASE_END
 
