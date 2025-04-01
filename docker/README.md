@@ -22,13 +22,13 @@ If you prefer to run Docker commands manually:
 ### Build the Docker image
 
 ```bash
-docker build -t tensorlight-test .
+docker build -t tofu-test .
 ```
 
 ### Run tests in the container
 
 ```bash
-docker run --rm tensorlight-test
+docker run --rm tofu-test
 ```
 
 ### Using Docker Compose
