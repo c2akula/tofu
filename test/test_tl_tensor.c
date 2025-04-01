@@ -887,6 +887,154 @@ LN_TEST_START(test_tl_tensor_elew_broadcast)
     tl_tensor_free(src2);
     tl_tensor_free_data_too(dst);
     tl_tensor_free(expected);
+    
+    // Test case 3: Column + Matrix (broadcasting column across all columns)
+    float col_data[] = {10, 20};
+    float matrix3_data[] = {1, 2, 3, 4, 5, 6};
+    float expected3_data[] = {11, 12, 13, 24, 25, 26};
+    
+    src1 = tl_tensor_create(col_data, 2, (int[]){2, 1}, TL_FLOAT);
+    src2 = tl_tensor_create(matrix3_data, 2, (int[]){2, 3}, TL_FLOAT);
+    expected = tl_tensor_create(expected3_data, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    dst = tl_tensor_elew_broadcast(src1, src2, NULL, TL_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected3_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test case 4: 3D broadcasting
+    float tensor3d_small[] = {1, 2};
+    float tensor3d_large[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float expected3d_data[] = {2, 4, 4, 6, 6, 8, 8, 10};
+    
+    src1 = tl_tensor_create(tensor3d_small, 1, (int[]){2}, TL_FLOAT);
+    src2 = tl_tensor_create(tensor3d_large, 3, (int[]){2, 2, 2}, TL_FLOAT);
+    expected = tl_tensor_create(expected3d_data, 3, (int[]){2, 2, 2}, TL_FLOAT);
+    
+    dst = tl_tensor_elew_broadcast(src1, src2, NULL, TL_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 2);
+    ck_assert_int_eq(dst->dims[2], 2);
+    ck_assert_int_eq(dst->len, 8);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected3d_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_elew_with_broadcasting)
+{
+    tl_tensor *src1, *src2, *dst, *expected;
+    
+    // Test case 1: Use standard elew with broadcastable tensors
+    float scalar_val = 3.0f;
+    float matrix_data[] = {1, 2, 3, 4, 5, 6};
+    float expected_data[] = {3, 6, 9, 12, 15, 18};
+    
+    src1 = tl_tensor_create(&scalar_val, 1, (int[]){1}, TL_FLOAT);
+    src2 = tl_tensor_create(matrix_data, 2, (int[]){2, 3}, TL_FLOAT);
+    expected = tl_tensor_create(expected_data, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    // Using standard elew that should now use broadcasting internally
+    dst = tl_tensor_elew(src1, src2, NULL, TL_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test case 2: Row-wise broadcasting with standard elew
+    float row_data[] = {10, 20, 30};
+    float matrix2_data[] = {1, 2, 3, 4, 5, 6};
+    float expected2_data[] = {10, 40, 90, 40, 100, 180};
+    
+    src1 = tl_tensor_create(row_data, 1, (int[]){3}, TL_FLOAT);
+    src2 = tl_tensor_create(matrix2_data, 2, (int[]){2, 3}, TL_FLOAT);
+    expected = tl_tensor_create(expected2_data, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    dst = tl_tensor_elew(src1, src2, NULL, TL_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected2_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_elew_param_with_broadcasting)
+{
+    tl_tensor *src, *dst, *expected;
+    double param = 5.0;
+    
+    // Test with a matrix - should use broadcasting internally
+    float matrix_data[] = {1, 2, 3, 4, 5, 6};
+    float expected_data[] = {5, 10, 15, 20, 25, 30};
+    
+    src = tl_tensor_create(matrix_data, 2, (int[]){2, 3}, TL_FLOAT);
+    expected = tl_tensor_create(expected_data, 2, (int[]){2, 3}, TL_FLOAT);
+    
+    dst = tl_tensor_elew_param(src, param, NULL, TL_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
+    
+    // Test with 3D tensor
+    float tensor3d_data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float expected3d_data[] = {6, 7, 8, 9, 10, 11, 12, 13};
+    
+    src = tl_tensor_create(tensor3d_data, 3, (int[]){2, 2, 2}, TL_FLOAT);
+    expected = tl_tensor_create(expected3d_data, 3, (int[]){2, 2, 2}, TL_FLOAT);
+    
+    dst = tl_tensor_elew_param(src, 5.0, NULL, TL_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 2);
+    ck_assert_int_eq(dst->dims[2], 2);
+    ck_assert_int_eq(dst->len, 8);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected3d_data, dst->len, 0);
+    tl_assert_tensor_eq(dst, expected);
+    
+    tl_tensor_free(src);
+    tl_tensor_free_data_too(dst);
+    tl_tensor_free(expected);
 }
 LN_TEST_END
 /* end of tests */
@@ -920,6 +1068,8 @@ LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
     LN_TEST_ADD_TEST(test_tl_tensor_isbroadcastable);
     LN_TEST_ADD_TEST(test_tl_tensor_broadcast_to);
     LN_TEST_ADD_TEST(test_tl_tensor_elew_broadcast);
+    LN_TEST_ADD_TEST(test_tl_tensor_elew_with_broadcasting);
+    LN_TEST_ADD_TEST(test_tl_tensor_elew_param_with_broadcasting);
 }
 LN_TEST_TCASE_END
 

@@ -33,30 +33,41 @@ TL_EXPORT tl_tensor *tl_tensor_elew(const tl_tensor *src1, const tl_tensor *src2
     void *elew_res;
     tl_elew_func elew;
 
-    assert(tl_tensor_issameshape(src1, src2));
     assert(src1->data && src2->data);
     assert(src1->dtype == src2->dtype);
-    if (dst) {
-        assert(dst->data);
-        assert(tl_tensor_issameshape(src1, dst));
-        assert(src1->dtype == dst->dtype);
-    } else {
-        dst = tl_tensor_zeros(src1->ndim, src2->dims, src1->dtype);
-    }
+    
+    // Check if shapes are the same for direct operation
+    if (tl_tensor_issameshape(src1, src2)) {
+        // Same shapes - use standard element-wise operation
+        if (dst) {
+            assert(dst->data);
+            assert(tl_tensor_issameshape(src1, dst));
+            assert(src1->dtype == dst->dtype);
+        } else {
+            dst = tl_tensor_zeros(src1->ndim, src1->dims, src1->dtype);
+        }
 
-    thread_num = dst->len;
-    s1_data = src1->data;
-    s2_data = src2->data;
-    d_data = dst->data;
-    dtype = src1->dtype;
-    dsize = tl_size_of(dtype);
-    elew = tl_elew_getfunc(dtype);
-    elew_res = tl_alloc(dsize);
-    for (di = 0; di < thread_num; di++) {
-        elew(tl_padd(s1_data, di, dsize), tl_padd(s2_data, di, dsize), elew_res, elew_op);
-        tl_passign(d_data, di, elew_res, 0, dsize);
+        thread_num = dst->len;
+        s1_data = src1->data;
+        s2_data = src2->data;
+        d_data = dst->data;
+        dtype = src1->dtype;
+        dsize = tl_size_of(dtype);
+        elew = tl_elew_getfunc(dtype);
+        elew_res = tl_alloc(dsize);
+        for (di = 0; di < thread_num; di++) {
+            elew(tl_padd(s1_data, di, dsize), tl_padd(s2_data, di, dsize), elew_res, elew_op);
+            tl_passign(d_data, di, elew_res, 0, dsize);
+        }
+        tl_free(elew_res);
+    } else if (tl_tensor_isbroadcastable(src1, src2)) {
+        // Different shapes but broadcastable - use broadcasting element-wise operation
+        return tl_tensor_elew_broadcast(src1, src2, dst, elew_op);
+    } else {
+        // Not broadcastable - error
+        tl_warn_ret("Tensors are not broadcastable for element-wise operation");
+        return NULL;
     }
-    tl_free(elew_res);
 
     return dst;
 }
@@ -71,8 +82,27 @@ TL_EXPORT tl_tensor *tl_tensor_elew_param(const tl_tensor *src, double param, tl
     void *s_data, *d_data;
     void *elew_res, *param_data;
     tl_elew_func elew;
+    tl_tensor *param_tensor = NULL;
 
     assert(src && src->data);
+
+    // Decide whether to use broadcasting or direct approach
+    if (src->ndim > 1) {
+        // For higher-dimensional tensors, use broadcasting with a scalar tensor
+        param_data = tl_alloc(tl_size_of(src->dtype));
+        tl_convert(param_data, src->dtype, &param, TL_DOUBLE);
+        param_tensor = tl_tensor_create(param_data, 1, (int[]){1}, src->dtype);
+        
+        // Use the broadcasting element-wise operation
+        dst = tl_tensor_elew_broadcast(param_tensor, src, dst, elew_op);
+        
+        // Clean up
+        tl_tensor_free(param_tensor);
+        tl_free(param_data);
+        return dst;
+    }
+    
+    // For simple cases, use the direct approach for better performance
     if (dst) {
         assert(dst->data);
         assert(tl_tensor_issameshape(src, dst));
