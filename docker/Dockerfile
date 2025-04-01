@@ -26,19 +26,19 @@ RUN apt-get update && apt-get install -y \
 # Create a workspace directory
 WORKDIR /app
 
-# Copy the TensorLight source code
+# Copy the Tofu source code
 COPY . .
 
 # Clean any existing build artifacts, configure and build the library
 RUN make clean && ./configure && make lib
 
 # Add a health check to ensure tests can run
-HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD [ -f "build/test/test_tensorlight" ] || exit 1
+HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD [ -f "build/test/test_tofu" ] || exit 1
 
 # Run the tests
 CMD ["make", "test"]
 
 # Label the image
-LABEL maintainer="TensorLight Maintainer" \
+LABEL maintainer="Tofu Maintainer" \
       version="0.1.0" \
-      description="Docker image for testing TensorLight library"
+      description="Docker image for testing Tofu library"

@@ -20,8 +20,8 @@
  * SOFTWARE.
  */
 
-#ifndef _TENSORLIGHT_H_
-#define _TENSORLIGHT_H_
+#ifndef _TOFU_H_
+#define _TOFU_H_
 
 /* start of config */
 
@@ -37,4 +37,4 @@ void tl_sprint_version(char *version_str);
 TL_CPPEND
 #endif
 
-#endif /* _TENSORLIGHT_H_ */
+#endif /* _TOFU_H_ */
