@@ -98,6 +98,7 @@ TL_CPPSTART
 /* Graph lifecycle */
 TL_EXPORT tl_graph* tl_graph_create(void);
 TL_EXPORT void tl_graph_free(tl_graph* g);
+TL_EXPORT void tl_graph_clear_ops(tl_graph* g);
 
 /* Build graph - leaf nodes */
 TL_EXPORT tl_graph_node* tl_graph_input(tl_graph* g, tl_tensor* data);

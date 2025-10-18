@@ -82,10 +82,14 @@ static void tl_graph_node_free(tl_graph_node* node)
         node->backward_ctx = NULL;
     }
 
-    /* Note: We don't free node->value here because:
+    /* Free value tensor for operation nodes only
      * - For INPUT/PARAM nodes, value is owned by user
-     * - For operation nodes, value will be freed by operations
+     * - For operation nodes, value is allocated by the operation and must be freed
      */
+    if (node->value && node->op != TL_OP_INPUT && node->op != TL_OP_PARAM) {
+        tl_tensor_free_data_too(node->value);
+        node->value = NULL;
+    }
 
     free(node);
 }
@@ -105,6 +109,38 @@ TL_EXPORT void tl_graph_free(tl_graph* g)
     free(g->nodes);
     free(g->topo_order);
     free(g);
+}
+
+/* Clear operation nodes from graph, keeping INPUT and PARAM nodes
+ * This is useful in training loops to avoid node accumulation
+ */
+TL_EXPORT void tl_graph_clear_ops(tl_graph* g)
+{
+    if (!g)
+        return;
+
+    /* Keep INPUT and PARAM nodes, remove all operation nodes */
+    int write_idx = 0;
+    for (int read_idx = 0; read_idx < g->num_nodes; read_idx++) {
+        tl_graph_node* node = g->nodes[read_idx];
+        if (node->op == TL_OP_INPUT || node->op == TL_OP_PARAM) {
+            /* Zero out gradients for reused nodes */
+            if (node->grad) {
+                for (int j = 0; j < node->grad->len; j++) {
+                    double zero = 0.0;
+                    TL_TENSOR_DATA_FROM(node->grad, j, zero, TL_DOUBLE);
+                }
+            }
+            g->nodes[write_idx++] = node;
+        } else {
+            /* Free operation node */
+            tl_graph_node_free(node);
+        }
+    }
+    g->num_nodes = write_idx;
+
+    /* Clear topological order */
+    g->topo_size = 0;
 }
 
 /* Add a node to the graph */
