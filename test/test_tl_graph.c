@@ -382,12 +382,10 @@ int main()
     printf("\nSprint 3: Backward Pass\n");
     printf("------------------------\n");
     test_backward_simple_matmul();
-    /* Temporarily disabled for debugging
     test_backward_add();
     test_backward_relu();
     test_backward_composite();
     test_gradient_accumulation();
-    */
 
     printf("\n============================================================\n");
     printf("All tests passed! ✓ (Sprints 1, 2 & 3 complete)\n");

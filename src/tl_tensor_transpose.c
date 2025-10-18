@@ -26,6 +26,14 @@ TL_EXPORT tl_tensor *tl_tensor_transpose(const tl_tensor *src, tl_tensor *dst, c
 {
     int i;
 
+    /* If axes is NULL, reverse all dimensions */
+    int default_axes[TL_MAXDIM];
+    if (!axes) {
+        for (i = 0; i < src->ndim; i++)
+            default_axes[i] = src->ndim - 1 - i;
+        axes = default_axes;
+    }
+
 #ifndef NDEBUG
     int tmp[TL_MAXDIM] = { 0 };
     for (i = 0; i < src->ndim; i++)

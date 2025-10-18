@@ -552,10 +552,39 @@ static void matmul_backward(tl_graph_node* node)
     if (!grad_y)
         return;
 
+    /* Handle 1D tensors by reshaping to 2D for gradient computation */
+    int is_A_1d = (A->value->ndim == 1);
+    int is_grad_y_1d = (grad_y->ndim == 1);
+
+    tl_tensor* grad_y_2d = NULL;
+    if (is_grad_y_1d && grad_y->dims[0] == 1) {
+        /* Reshape [1] to [1, 1] */
+        int new_dims[] = {1, 1};
+        grad_y_2d = tl_tensor_reshape(grad_y, 2, new_dims);
+    } else if (is_grad_y_1d) {
+        /* Reshape [n] to [1, n] */
+        int new_dims[] = {1, grad_y->dims[0]};
+        grad_y_2d = tl_tensor_reshape(grad_y, 2, new_dims);
+    } else {
+        grad_y_2d = grad_y;
+    }
+
     /* ∂L/∂A = (∂L/∂y) @ B^T */
     if (A->requires_grad) {
         tl_tensor* B_T = tl_tensor_transpose(B->value, NULL, NULL);
-        tl_tensor* grad_A = tl_tensor_matmul(grad_y, B_T, NULL);
+        tl_tensor* grad_A = tl_tensor_matmul(grad_y_2d, B_T, NULL);
+
+        /* Reshape back to original shape if needed */
+        if (is_A_1d && grad_A->ndim == 2) {
+            if (grad_A->dims[0] == 1) {
+                /* Squeeze [1, n] to [n] */
+                int new_dims[] = {grad_A->dims[1]};
+                tl_tensor* grad_A_1d = tl_tensor_reshape(grad_A, 1, new_dims);
+                tl_tensor_free(grad_A);
+                grad_A = grad_A_1d;
+            }
+        }
+
         accumulate_grad(A, grad_A);
         tl_tensor_free_data_too(B_T);
         tl_tensor_free_data_too(grad_A);
@@ -563,11 +592,44 @@ static void matmul_backward(tl_graph_node* node)
 
     /* ∂L/∂B = A^T @ (∂L/∂y) */
     if (B->requires_grad) {
-        tl_tensor* A_T = tl_tensor_transpose(A->value, NULL, NULL);
-        tl_tensor* grad_B = tl_tensor_matmul(A_T, grad_y, NULL);
+        tl_tensor* A_val = A->value;
+        tl_tensor* A_2d = NULL;
+
+        /* If A is 1D, reshape to row vector [1, n] (matching forward behavior) */
+        if (is_A_1d) {
+            int new_dims[] = {1, A->value->dims[0]};
+            A_2d = tl_tensor_reshape(A->value, 2, new_dims);
+            A_val = A_2d;
+        }
+
+        /* Transpose: [1, n] → [n, 1] */
+        tl_tensor* A_T = tl_tensor_transpose(A_val, NULL, NULL);
+
+        /* Reshape grad_y if needed for matmul with A_T */
+        tl_tensor* grad_y_for_B = grad_y;
+        tl_tensor* grad_y_B_reshaped = NULL;
+        if (is_grad_y_1d) {
+            /* Reshape [n] to [1, n] to match matmul semantics */
+            int new_dims[] = {1, grad_y->dims[0]};
+            grad_y_B_reshaped = tl_tensor_reshape(grad_y, 2, new_dims);
+            grad_y_for_B = grad_y_B_reshaped;
+        }
+
+        tl_tensor* grad_B = tl_tensor_matmul(A_T, grad_y_for_B, NULL);
+
         accumulate_grad(B, grad_B);
+
+        if (A_2d)
+            tl_tensor_free(A_2d);
+        if (grad_y_B_reshaped)
+            tl_tensor_free(grad_y_B_reshaped);
         tl_tensor_free_data_too(A_T);
         tl_tensor_free_data_too(grad_B);
+    }
+
+    /* Free temporary grad_y_2d if we created it */
+    if (grad_y_2d != grad_y && grad_y_2d) {
+        tl_tensor_free(grad_y_2d);
     }
 }
 
