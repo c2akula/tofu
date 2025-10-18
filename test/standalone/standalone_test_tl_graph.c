@@ -1281,8 +1281,8 @@ void test_vit_training()
     initial_loss /= 2.0f;
     printf("  Initial loss: %.4f\n", initial_loss);
 
-    /* Training loop */
-    for (int iter = 0; iter < 10; iter++) {
+    /* Training loop - increased epochs with new memory fixes */
+    for (int iter = 0; iter < 50; iter++) {
         float epoch_loss = 0.0f;
 
         for (int sample_idx = 0; sample_idx < 2; sample_idx++) {
@@ -1314,18 +1314,22 @@ void test_vit_training()
             float loss = error * error;
             epoch_loss += loss;
 
-            /* Backward pass */
-            logits->grad = tl_tensor_create((float[]){2.0f * error}, 1, (int[]){1}, TL_FLOAT);
+            /* Backward pass - using tl_tensor_create_with_values (fixed memory issue) */
+            float grad_value = 2.0f * error;
+            logits->grad = tl_tensor_create_with_values(&grad_value, 1, (int[]){1});
             tl_graph_backward(g, logits);
 
             /* Update parameters */
             tl_optimizer_step(opt);
 
             tl_tensor_free(t_img);
+
+            /* Clear operation nodes to prevent accumulation (new fix!) */
+            tl_graph_clear_ops(g);
         }
 
         epoch_loss /= 2.0f;
-        if (iter % 3 == 0) {
+        if (iter % 10 == 0 || iter == 49) {
             printf("  Epoch %d: loss = %.4f\n", iter, epoch_loss);
         }
     }
@@ -1370,8 +1374,8 @@ void test_vit_training()
     tl_tensor_free(t_Wv);
     tl_tensor_free(t_W_cls);
     tl_optimizer_free(opt);
-    /* Skip graph_free due to known issue */
-    // tl_graph_free(g);
+    /* Graph can now be freed safely with our memory fixes! */
+    tl_graph_free(g);
 
     printf("  ✓ PASSED (loss: %.4f → %.4f)\n", initial_loss, final_loss);
 }
@@ -1395,11 +1399,12 @@ void test_system_validation()
 
     printf("\n  Validated Architectures:\n");
     printf("  ✓ Multi-layer Perceptron (XOR: 0.40 → 0.13 loss)\n");
-    printf("  ✓ Vision Transformer (Binary: 0.49 → 0.35 loss)\n");
+    printf("  ✓ Vision Transformer (Binary classification, 50 epochs w/ memory fixes)\n");
 
-    printf("\n  Known Limitations:\n");
-    printf("  ⚠ graph_free() hangs in training contexts (workaround: skip)\n");
-    printf("  ⚠ Graph accumulation over many iterations (workaround: limit)\n");
+    printf("\n  Recent Improvements:\n");
+    printf("  ✓ Fixed: graph_free() memory corruption (use tl_tensor_create_with_values)\n");
+    printf("  ✓ Fixed: Graph accumulation (use tl_graph_clear_ops in training loops)\n");
+    printf("  ✓ Fixed: Operation node memory leaks\n");
     printf("  ⚠ No data loading utilities (synthetic data only)\n");
 
     printf("\n  System Statistics:\n");

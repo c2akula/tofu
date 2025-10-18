@@ -85,9 +85,16 @@ static void tl_graph_node_free(tl_graph_node* node)
     /* Free value tensor for operation nodes only
      * - For INPUT/PARAM nodes, value is owned by user
      * - For operation nodes, value is allocated by the operation and must be freed
+     * - For view operations (reshape, transpose), only free tensor struct, not data
      */
     if (node->value && node->op != TL_OP_INPUT && node->op != TL_OP_PARAM) {
-        tl_tensor_free_data_too(node->value);
+        if (node->value->owner) {
+            /* This is a view (reshape/transpose) - only free tensor struct */
+            tl_tensor_free(node->value);
+        } else {
+            /* This allocates its own data - free everything */
+            tl_tensor_free_data_too(node->value);
+        }
         node->value = NULL;
     }
 
