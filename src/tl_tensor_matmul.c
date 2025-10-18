@@ -24,6 +24,7 @@
 #include "tl_util.h"
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 #include <errno.h>
 
 /*
@@ -129,6 +130,11 @@ tl_tensor *tl_tensor_matmul(const tl_tensor *src1, const tl_tensor *src2, tl_ten
             batch_dims[i] = a_dim;
         } else {
             /* Broadcasting error */
+            char msg[256];
+            snprintf(msg, sizeof(msg),
+                    "matmul: batch dimensions not broadcastable: dim %d has size %d in first tensor and %d in second tensor",
+                    i, a_dim, b_dim);
+            tl_warn_ret(msg);
             tl_tensor_free(a_temp);
             tl_tensor_free(b_temp);
             errno = EINVAL;
