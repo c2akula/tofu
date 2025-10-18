@@ -1429,6 +1429,132 @@ LN_TEST_START(test_tl_tensor_matmul)
     tl_tensor_free_data_too(dst);
 }
 LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_outer)
+{
+    tl_tensor *src1, *src2, *dst;
+
+    /* Test case 1: Basic 1-D outer 1-D: [3] outer [4] -> [3,4] */
+    int32_t vec1_data[3] = {1, 2, 3};
+    int32_t vec2_data[4] = {4, 5, 6, 7};
+    int32_t expected_3x4[12] = {4, 5, 6, 7, 8, 10, 12, 14, 12, 15, 18, 21};
+
+    src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+    src2 = tl_tensor_create(vec2_data, 1, ARR(int, 4), TL_INT32);
+    dst = tl_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 4);
+    for (int i = 0; i < 12; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_3x4[i]);
+    }
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 2: Scalar outer product [1] outer [1] -> [1,1] */
+    int32_t scalar1 = 5;
+    int32_t scalar2 = 3;
+    src1 = tl_tensor_create(&scalar1, 1, ARR(int, 1), TL_INT32);
+    src2 = tl_tensor_create(&scalar2, 1, ARR(int, 1), TL_INT32);
+    dst = tl_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 1);
+    ck_assert_int_eq(dst->dims[1], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 15);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 3: Different sizes [2] outer [5] -> [2,5] */
+    float a_data[2] = {1.0f, 2.0f};
+    float b_data[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    float expected_2x5[10] = {1, 2, 3, 4, 5, 2, 4, 6, 8, 10};
+
+    src1 = tl_tensor_create(a_data, 1, ARR(int, 2), TL_FLOAT);
+    src2 = tl_tensor_create(b_data, 1, ARR(int, 5), TL_FLOAT);
+    dst = tl_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 5);
+    for (int i = 0; i < 10; i++) {
+        ck_assert(fabsf(((float*)dst->data)[i] - expected_2x5[i]) < 1e-5);
+    }
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 4: Multi-dimensional inputs (flattened) [2,2] outer [2,2] -> [4,4] */
+    int32_t mat1_data[4] = {1, 2, 3, 4};
+    int32_t mat2_data[4] = {1, 1, 2, 2};
+
+    src1 = tl_tensor_create(mat1_data, 2, ARR(int, 2, 2), TL_INT32);
+    src2 = tl_tensor_create(mat2_data, 2, ARR(int, 2, 2), TL_INT32);
+    dst = tl_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 4);  // flattened src1
+    ck_assert_int_eq(dst->dims[1], 4);  // flattened src2
+    // Verify a few elements: out[i,j] = src1[i] * src2[j]
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 1);   // [0,0]: 1*1
+    ck_assert_int_eq(((int32_t*)dst->data)[5], 2);   // [1,1]: 2*1
+    ck_assert_int_eq(((int32_t*)dst->data)[10], 6);  // [2,2]: 3*2
+    ck_assert_int_eq(((int32_t*)dst->data)[15], 8);  // [3,3]: 4*2
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 5: Negative numbers [3] outer [3] -> [3,3] */
+    int32_t neg_data1[3] = {-1, 0, 1};
+    int32_t neg_data2[3] = {1, 2, 3};
+    int32_t expected_neg[9] = {-1, -2, -3, 0, 0, 0, 1, 2, 3};
+
+    src1 = tl_tensor_create(neg_data1, 1, ARR(int, 3), TL_INT32);
+    src2 = tl_tensor_create(neg_data2, 1, ARR(int, 3), TL_INT32);
+    dst = tl_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 3);
+    for (int i = 0; i < 9; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_neg[i]);
+    }
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 6: Pre-allocated destination */
+    src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+    src2 = tl_tensor_create(vec2_data, 1, ARR(int, 4), TL_INT32);
+    dst = tl_tensor_zeros(2, ARR(int, 3, 4), TL_INT32);
+    dst = tl_tensor_outer(src1, src2, dst);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 4);
+    for (int i = 0; i < 12; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_3x4[i]);
+    }
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+}
+LN_TEST_END
 /* end of tests */
 
 LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
@@ -1453,6 +1579,7 @@ LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
     LN_TEST_ADD_TEST(test_tl_tensor_elew_param);
     LN_TEST_ADD_TEST(test_tl_tensor_inner);
     LN_TEST_ADD_TEST(test_tl_tensor_matmul);
+    LN_TEST_ADD_TEST(test_tl_tensor_outer);
     LN_TEST_ADD_TEST(test_tl_tensor_transpose);
     LN_TEST_ADD_TEST(test_tl_tensor_lrelu);
     LN_TEST_ADD_TEST(test_tl_tensor_convert);
