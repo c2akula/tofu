@@ -110,3 +110,11 @@ TL_CPPEND
 #endif
 
 #endif /* _TL_TENSOR_H_ */
+
+/* Create a tensor with heap-allocated data (safe for gradients)
+ * IMPORTANT: Do NOT use compound literals like (float[]){1.0f, 2.0f} for
+ * gradient data, as they create stack memory that becomes invalid.
+ * Use this function or manually malloc the data.
+ */
+TL_EXPORT tl_tensor* tl_tensor_create_with_values(const float* values, int ndim, const int* dims);
+

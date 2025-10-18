@@ -300,3 +300,22 @@ TL_EXPORT int tl_tensor_save(const char *file_name, const tl_tensor *t, const ch
     fclose(fp);
     return 0;
 }
+
+/* Create a tensor with heap-allocated data (safe for gradients) */
+TL_EXPORT tl_tensor* tl_tensor_create_with_values(const float* values, int ndim, const int* dims)
+{
+    /* Calculate total elements */
+    int len = 1;
+    for (int i = 0; i < ndim; i++) {
+        len *= dims[i];
+    }
+    
+    /* Allocate data on heap */
+    float* data = (float*)tl_alloc(len * sizeof(float));
+    memcpy(data, values, len * sizeof(float));
+    
+    /* Create tensor */
+    tl_tensor* t = tl_tensor_create(data, ndim, dims, TL_FLOAT);
+    t->owner = t;  /* This tensor owns its data */
+    return t;
+}
