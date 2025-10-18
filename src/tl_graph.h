@@ -103,6 +103,18 @@ TL_EXPORT void tl_graph_free(tl_graph* g);
 TL_EXPORT tl_graph_node* tl_graph_input(tl_graph* g, tl_tensor* data);
 TL_EXPORT tl_graph_node* tl_graph_param(tl_graph* g, tl_tensor* data);
 
+/* Forward pass operations */
+TL_EXPORT tl_graph_node* tl_graph_matmul(tl_graph* g, tl_graph_node* a, tl_graph_node* b);
+TL_EXPORT tl_graph_node* tl_graph_add(tl_graph* g, tl_graph_node* a, tl_graph_node* b);
+TL_EXPORT tl_graph_node* tl_graph_mul(tl_graph* g, tl_graph_node* a, tl_graph_node* b);
+TL_EXPORT tl_graph_node* tl_graph_relu(tl_graph* g, tl_graph_node* x);
+TL_EXPORT tl_graph_node* tl_graph_softmax(tl_graph* g, tl_graph_node* x, int axis);
+TL_EXPORT tl_graph_node* tl_graph_layer_norm(tl_graph* g, tl_graph_node* x,
+                                             tl_graph_node* gamma, tl_graph_node* beta,
+                                             int axis, double eps);
+TL_EXPORT tl_graph_node* tl_graph_reshape(tl_graph* g, tl_graph_node* x, int ndim, const int* dims);
+TL_EXPORT tl_graph_node* tl_graph_transpose(tl_graph* g, tl_graph_node* x, const int* axes);
+
 /* Utility functions */
 TL_EXPORT tl_tensor* tl_graph_get_value(tl_graph_node* node);
 TL_EXPORT tl_tensor* tl_graph_get_grad(tl_graph_node* node);

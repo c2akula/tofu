@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 #include "tl_graph.h"
 
 /* Sprint 1 Tests: Core Infrastructure */
@@ -166,12 +167,196 @@ void test_graph_zero_grad()
     printf("  ✓ PASSED\n");
 }
 
+/* Sprint 2 Tests: Forward Pass Operations */
+
+void test_graph_matmul()
+{
+    printf("Test: Matrix multiplication...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    /* A: [2, 3], B: [3, 2] -> C: [2, 2] */
+    float data_a[] = {1.0f, 2.0f, 3.0f,
+                      4.0f, 5.0f, 6.0f};
+    float data_b[] = {1.0f, 2.0f,
+                      3.0f, 4.0f,
+                      5.0f, 6.0f};
+
+    tl_tensor* t_a = tl_tensor_create(data_a, 2, (int[]){2, 3}, TL_FLOAT);
+    tl_tensor* t_b = tl_tensor_create(data_b, 2, (int[]){3, 2}, TL_FLOAT);
+
+    tl_graph_node* a = tl_graph_param(g, t_a);
+    tl_graph_node* b = tl_graph_param(g, t_b);
+    tl_graph_node* c = tl_graph_matmul(g, a, b);
+
+    assert(c != NULL);
+    assert(c->op == TL_OP_MATMUL);
+    assert(c->value != NULL);
+    assert(c->value->ndim == 2);
+    assert(c->value->dims[0] == 2);
+    assert(c->value->dims[1] == 2);
+    assert(c->requires_grad == 1);  /* Both inputs are params */
+    assert(c->num_inputs == 2);
+    assert(c->inputs[0] == a);
+    assert(c->inputs[1] == b);
+
+    /* Verify result: [22, 28], [49, 64] */
+    float expected[] = {22.0f, 28.0f, 49.0f, 64.0f};
+    for (int i = 0; i < 4; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(c->value, i, val, TL_FLOAT);
+        assert(fabsf(val - expected[i]) < 1e-5);
+    }
+
+    tl_tensor_free(t_a);
+    tl_tensor_free(t_b);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+void test_graph_add()
+{
+    printf("Test: Element-wise addition...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    float data_a[] = {1.0f, 2.0f, 3.0f};
+    float data_b[] = {4.0f, 5.0f, 6.0f};
+
+    tl_tensor* t_a = tl_tensor_create(data_a, 1, (int[]){3}, TL_FLOAT);
+    tl_tensor* t_b = tl_tensor_create(data_b, 1, (int[]){3}, TL_FLOAT);
+
+    tl_graph_node* a = tl_graph_input(g, t_a);
+    tl_graph_node* b = tl_graph_param(g, t_b);
+    tl_graph_node* c = tl_graph_add(g, a, b);
+
+    assert(c != NULL);
+    assert(c->op == TL_OP_ADD);
+    assert(c->value != NULL);
+    assert(c->requires_grad == 1);  /* b requires grad */
+
+    /* Verify result: [5, 7, 9] */
+    float expected[] = {5.0f, 7.0f, 9.0f};
+    for (int i = 0; i < 3; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(c->value, i, val, TL_FLOAT);
+        assert(fabsf(val - expected[i]) < 1e-5);
+    }
+
+    tl_tensor_free(t_a);
+    tl_tensor_free(t_b);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+void test_graph_relu()
+{
+    printf("Test: ReLU activation...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    float data[] = {-2.0f, -1.0f, 0.0f, 1.0f, 2.0f};
+    tl_tensor* t = tl_tensor_create(data, 1, (int[]){5}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_param(g, t);
+    tl_graph_node* y = tl_graph_relu(g, x);
+
+    assert(y != NULL);
+    assert(y->op == TL_OP_RELU);
+    assert(y->requires_grad == 1);
+
+    /* Verify result: [0, 0, 0, 1, 2] */
+    float expected[] = {0.0f, 0.0f, 0.0f, 1.0f, 2.0f};
+    for (int i = 0; i < 5; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        assert(fabsf(val - expected[i]) < 1e-5);
+    }
+
+    tl_tensor_free(t);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+void test_graph_softmax()
+{
+    printf("Test: Softmax activation...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    float data[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    tl_tensor* t = tl_tensor_create(data, 1, (int[]){5}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_input(g, t);
+    tl_graph_node* y = tl_graph_softmax(g, x, 0);
+
+    assert(y != NULL);
+    assert(y->op == TL_OP_SOFTMAX);
+
+    /* Verify sum is 1.0 */
+    float sum = 0.0f;
+    for (int i = 0; i < 5; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        sum += val;
+    }
+    assert(fabsf(sum - 1.0f) < 1e-5);
+
+    tl_tensor_free(t);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+void test_graph_composite()
+{
+    printf("Test: Composite graph (y = ReLU(Wx + b))...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    /* x: [2], W: [3, 2], b: [3] */
+    float data_x[] = {1.0f, 2.0f};
+    float data_W[] = {0.5f, -0.3f, 0.2f, 0.1f, -0.4f, 0.6f};
+    float data_b[] = {0.1f, -0.5f, 0.3f};
+
+    tl_tensor* t_x = tl_tensor_create(data_x, 1, (int[]){2}, TL_FLOAT);
+    tl_tensor* t_W = tl_tensor_create(data_W, 2, (int[]){2, 3}, TL_FLOAT);
+    tl_tensor* t_b = tl_tensor_create(data_b, 1, (int[]){3}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    tl_graph_node* W = tl_graph_param(g, t_W);
+    tl_graph_node* b = tl_graph_param(g, t_b);
+
+    /* y = ReLU(x @ W + b) */
+    tl_graph_node* xW = tl_graph_matmul(g, x, W);
+    tl_graph_node* xWb = tl_graph_add(g, xW, b);
+    tl_graph_node* y = tl_graph_relu(g, xWb);
+
+    assert(y != NULL);
+    assert(y->value->len == 3);
+    assert(g->num_nodes == 6);  /* x, W, b, xW, xWb, y */
+
+    /* Check that gradients propagate (requires_grad) */
+    assert(x->requires_grad == 0);  /* input */
+    assert(W->requires_grad == 1);  /* param */
+    assert(xW->requires_grad == 1); /* depends on W */
+    assert(xWb->requires_grad == 1);
+    assert(y->requires_grad == 1);
+
+    tl_tensor_free(t_x);
+    tl_tensor_free(t_W);
+    tl_tensor_free(t_b);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
 int main()
 {
     printf("============================================================\n");
-    printf("Sprint 1: Core Graph Infrastructure Tests\n");
+    printf("Sprint 1 & 2: Computation Graph Tests\n");
     printf("============================================================\n\n");
 
+    printf("Sprint 1: Core Infrastructure\n");
+    printf("------------------------------\n");
     test_graph_create_free();
     test_graph_input_node();
     test_graph_param_node();
@@ -179,8 +364,16 @@ int main()
     test_graph_capacity_expansion();
     test_graph_zero_grad();
 
+    printf("\nSprint 2: Forward Pass Operations\n");
+    printf("-----------------------------------\n");
+    test_graph_matmul();
+    test_graph_add();
+    test_graph_relu();
+    test_graph_softmax();
+    test_graph_composite();
+
     printf("\n============================================================\n");
-    printf("Sprint 1: All tests passed! ✓\n");
+    printf("All tests passed! ✓ (Sprint 1 & 2 complete)\n");
     printf("============================================================\n");
 
     return 0;

@@ -207,3 +207,271 @@ TL_EXPORT void tl_graph_zero_grad(tl_graph* g)
         }
     }
 }
+
+/* Helper: Add input to node */
+static int tl_graph_node_add_input(tl_graph_node* node, tl_graph_node* input)
+{
+    assert(node && input);
+
+    /* Expand capacity if needed */
+    if (node->num_inputs >= node->capacity_inputs) {
+        int new_capacity = node->capacity_inputs == 0 ? 2 : node->capacity_inputs * 2;
+        tl_graph_node** new_inputs = (tl_graph_node**)realloc(
+            node->inputs, new_capacity * sizeof(tl_graph_node*));
+        if (!new_inputs)
+            return -1;
+        node->inputs = new_inputs;
+        node->capacity_inputs = new_capacity;
+    }
+
+    node->inputs[node->num_inputs++] = input;
+    return 0;
+}
+
+/* Helper: Check if any input requires gradient */
+static int tl_graph_any_requires_grad(tl_graph_node** inputs, int num_inputs)
+{
+    for (int i = 0; i < num_inputs; i++) {
+        if (inputs[i]->requires_grad)
+            return 1;
+    }
+    return 0;
+}
+
+/* Matrix multiplication: y = a @ b */
+TL_EXPORT tl_graph_node* tl_graph_matmul(tl_graph* g, tl_graph_node* a, tl_graph_node* b)
+{
+    assert(g && a && b);
+    assert(a->value && b->value);
+
+    /* Create node */
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_MATMUL);
+    if (!node)
+        return NULL;
+
+    /* Add inputs */
+    if (tl_graph_node_add_input(node, a) < 0 || tl_graph_node_add_input(node, b) < 0) {
+        return NULL;
+    }
+
+    /* Compute forward pass */
+    node->value = tl_tensor_matmul(a->value, b->value, NULL);
+    if (!node->value)
+        return NULL;
+
+    /* Determine if gradient is required */
+    node->requires_grad = tl_graph_any_requires_grad(node->inputs, node->num_inputs);
+
+    return node;
+}
+
+/* Element-wise addition: z = a + b */
+TL_EXPORT tl_graph_node* tl_graph_add(tl_graph* g, tl_graph_node* a, tl_graph_node* b)
+{
+    assert(g && a && b);
+    assert(a->value && b->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_ADD);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, a) < 0 || tl_graph_node_add_input(node, b) < 0) {
+        return NULL;
+    }
+
+    /* Use broadcasting if shapes don't match exactly */
+    node->value = tl_tensor_elew_broadcast(a->value, b->value, NULL, TL_SUM);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = tl_graph_any_requires_grad(node->inputs, node->num_inputs);
+
+    return node;
+}
+
+/* Element-wise multiplication: z = a * b */
+TL_EXPORT tl_graph_node* tl_graph_mul(tl_graph* g, tl_graph_node* a, tl_graph_node* b)
+{
+    assert(g && a && b);
+    assert(a->value && b->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_MUL);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, a) < 0 || tl_graph_node_add_input(node, b) < 0) {
+        return NULL;
+    }
+
+    node->value = tl_tensor_elew_broadcast(a->value, b->value, NULL, TL_MUL);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = tl_graph_any_requires_grad(node->inputs, node->num_inputs);
+
+    return node;
+}
+
+/* ReLU activation: y = max(0, x) */
+TL_EXPORT tl_graph_node* tl_graph_relu(tl_graph* g, tl_graph_node* x)
+{
+    assert(g && x);
+    assert(x->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_RELU);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, x) < 0) {
+        return NULL;
+    }
+
+    /* ReLU: max(0, x) - using lrelu with negslope=0 */
+    node->value = tl_tensor_lrelu(x->value, NULL, 0.0f);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = x->requires_grad;
+
+    return node;
+}
+
+/* Softmax activation: y = softmax(x) along axis */
+TL_EXPORT tl_graph_node* tl_graph_softmax(tl_graph* g, tl_graph_node* x, int axis)
+{
+    assert(g && x);
+    assert(x->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_SOFTMAX);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, x) < 0) {
+        return NULL;
+    }
+
+    /* Store axis in backward context for later */
+    int* axis_ctx = (int*)malloc(sizeof(int));
+    if (!axis_ctx)
+        return NULL;
+    *axis_ctx = axis;
+    node->backward_ctx = axis_ctx;
+
+    node->value = tl_tensor_softmax(x->value, NULL, axis);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = x->requires_grad;
+
+    return node;
+}
+
+/* Layer normalization */
+TL_EXPORT tl_graph_node* tl_graph_layer_norm(tl_graph* g, tl_graph_node* x,
+                                             tl_graph_node* gamma, tl_graph_node* beta,
+                                             int axis, double eps)
+{
+    assert(g && x);
+    assert(x->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_LAYER_NORM);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, x) < 0)
+        return NULL;
+    if (gamma && tl_graph_node_add_input(node, gamma) < 0)
+        return NULL;
+    if (beta && tl_graph_node_add_input(node, beta) < 0)
+        return NULL;
+
+    /* Store axis and eps in backward context */
+    typedef struct {
+        int axis;
+        double eps;
+    } layer_norm_ctx;
+
+    layer_norm_ctx* ctx = (layer_norm_ctx*)malloc(sizeof(layer_norm_ctx));
+    if (!ctx)
+        return NULL;
+    ctx->axis = axis;
+    ctx->eps = eps;
+    node->backward_ctx = ctx;
+
+    node->value = tl_tensor_layer_norm(x->value, NULL,
+                                       gamma ? gamma->value : NULL,
+                                       beta ? beta->value : NULL,
+                                       axis, eps);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = tl_graph_any_requires_grad(node->inputs, node->num_inputs);
+
+    return node;
+}
+
+/* Reshape operation */
+TL_EXPORT tl_graph_node* tl_graph_reshape(tl_graph* g, tl_graph_node* x, int ndim, const int* dims)
+{
+    assert(g && x);
+    assert(x->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_RESHAPE);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, x) < 0)
+        return NULL;
+
+    /* Store original shape for backward pass */
+    int* shape_ctx = (int*)malloc((x->value->ndim + 1) * sizeof(int));
+    if (!shape_ctx)
+        return NULL;
+    shape_ctx[0] = x->value->ndim;
+    for (int i = 0; i < x->value->ndim; i++) {
+        shape_ctx[i + 1] = x->value->dims[i];
+    }
+    node->backward_ctx = shape_ctx;
+
+    node->value = tl_tensor_reshape(x->value, ndim, dims);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = x->requires_grad;
+
+    return node;
+}
+
+/* Transpose operation */
+TL_EXPORT tl_graph_node* tl_graph_transpose(tl_graph* g, tl_graph_node* x, const int* axes)
+{
+    assert(g && x);
+    assert(x->value);
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_TRANSPOSE);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, x) < 0)
+        return NULL;
+
+    /* Store axes for backward pass */
+    int* axes_ctx = NULL;
+    if (axes) {
+        axes_ctx = (int*)malloc(x->value->ndim * sizeof(int));
+        if (!axes_ctx)
+            return NULL;
+        for (int i = 0; i < x->value->ndim; i++) {
+            axes_ctx[i] = axes[i];
+        }
+    }
+    node->backward_ctx = axes_ctx;
+
+    node->value = tl_tensor_transpose(x->value, NULL, axes);
+    if (!node->value)
+        return NULL;
+
+    node->requires_grad = x->requires_grad;
+
+    return node;
+}
