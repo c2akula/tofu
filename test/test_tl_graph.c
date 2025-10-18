@@ -362,8 +362,10 @@ void test_graph_composite()
     printf("  ✓ PASSED\n");
 }
 
-/* Forward declaration for Sprint 6 test */
+/* Forward declarations for Sprint 6-7 tests */
 void test_mlp_xor();
+void test_vit_patch_embedding();
+void test_vit_self_attention();
 
 int main()
 {
@@ -411,8 +413,13 @@ int main()
     printf("-----------------------------------------\n");
     test_mlp_xor();
 
+    printf("\nSprint 7: Vision Transformer Forward Pass\n");
+    printf("-------------------------------------------\n");
+    test_vit_patch_embedding();
+    test_vit_self_attention();
+
     printf("\n============================================================\n");
-    printf("All tests passed! ✓ (Sprints 1-6 complete)\n");
+    printf("All tests passed! ✓ (Sprints 1-7 complete)\n");
     printf("============================================================\n");
 
     return 0;
@@ -1034,4 +1041,139 @@ void test_mlp_xor()
     // tl_graph_free(g);
 
     printf("  ✓ PASSED (loss: %.4f → %.4f)\n", initial_loss, final_loss);
+}
+
+/* ============================================================
+ * Sprint 7: Vision Transformer Forward Pass
+ * ============================================================ */
+
+void test_vit_patch_embedding()
+{
+    printf("Test: ViT patch embedding...\n");
+
+    /* Simplified test: 4×4 image, 2×2 patches → 4 patches
+     * Image: [4, 4] = 16 pixels
+     * Patch size: 2×2 = 4 pixels/patch
+     * Num patches: (4/2) * (4/2) = 4
+     * Embed dim: 8
+     */
+
+    tl_graph* g = tl_graph_create();
+
+    /* Create a 4×4 image (flattened) */
+    float img_data[16] = {
+        1,2,3,4,
+        5,6,7,8,
+        9,10,11,12,
+        13,14,15,16
+    };
+    tl_tensor* t_img = tl_tensor_create(img_data, 1, (int[]){16}, TL_FLOAT);
+    tl_graph_node* img = tl_graph_input(g, t_img);
+
+    /* Reshape to [4, 4] patches (each patch is 4 pixels)
+     * Patch 0: [1,2,5,6], Patch 1: [3,4,7,8]
+     * Patch 2: [9,10,13,14], Patch 3: [11,12,15,16]
+     *
+     * For simplicity, just reshape to [4, 4] = 4 patches of 4 pixels
+     */
+    tl_graph_node* patches = tl_graph_reshape(g, img, 2, (int[]){4, 4});
+
+    /* Project patches to embedding dimension: [4, 4] @ [4, 8] → [4, 8] */
+    int patch_dim = 4;
+    int embed_dim = 8;
+    int num_patches = 4;
+
+    float W_data[32];  /* 4×8 */
+    for (int i = 0; i < 32; i++) {
+        W_data[i] = 0.1f * (i % 3 - 1);  /* Small values: -0.1, 0, 0.1 */
+    }
+    tl_tensor* t_W = tl_tensor_create(W_data, 2, (int[]){patch_dim, embed_dim}, TL_FLOAT);
+    tl_graph_node* W = tl_graph_param(g, t_W);
+
+    tl_graph_node* embeddings = tl_graph_matmul(g, patches, W);
+
+    /* Verify output shape: [4, 8] */
+    assert(embeddings->value->ndim == 2);
+    assert(embeddings->value->dims[0] == num_patches);
+    assert(embeddings->value->dims[1] == embed_dim);
+
+    printf("  Patch embedding shape: [%d, %d]\n",
+           embeddings->value->dims[0], embeddings->value->dims[1]);
+
+    tl_tensor_free(t_img);
+    tl_tensor_free(t_W);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+void test_vit_self_attention()
+{
+    printf("Test: ViT self-attention mechanism...\n");
+
+    /* Simplified single-head attention:
+     * Input: [4, 8] (4 tokens, 8-dim embeddings)
+     * Q, K, V projections: [8, 8]
+     * Attention: softmax(Q @ K^T) @ V → [4, 8]
+     */
+
+    tl_graph* g = tl_graph_create();
+
+    int seq_len = 4;
+    int embed_dim = 8;
+
+    /* Create input tokens */
+    float input_data[32];
+    for (int i = 0; i < 32; i++) {
+        input_data[i] = 0.1f * i;
+    }
+    tl_tensor* t_input = tl_tensor_create(input_data, 2, (int[]){seq_len, embed_dim}, TL_FLOAT);
+    tl_graph_node* input = tl_graph_input(g, t_input);
+
+    /* Q, K, V projection matrices */
+    float Wq_data[64], Wk_data[64], Wv_data[64];
+    for (int i = 0; i < 64; i++) {
+        Wq_data[i] = 0.1f * ((i % 5) - 2);
+        Wk_data[i] = 0.1f * ((i % 7) - 3);
+        Wv_data[i] = 0.1f * ((i % 3) - 1);
+    }
+    tl_tensor* t_Wq = tl_tensor_create(Wq_data, 2, (int[]){embed_dim, embed_dim}, TL_FLOAT);
+    tl_tensor* t_Wk = tl_tensor_create(Wk_data, 2, (int[]){embed_dim, embed_dim}, TL_FLOAT);
+    tl_tensor* t_Wv = tl_tensor_create(Wv_data, 2, (int[]){embed_dim, embed_dim}, TL_FLOAT);
+
+    tl_graph_node* Wq = tl_graph_param(g, t_Wq);
+    tl_graph_node* Wk = tl_graph_param(g, t_Wk);
+    tl_graph_node* Wv = tl_graph_param(g, t_Wv);
+
+    /* Compute Q, K, V: [4, 8] @ [8, 8] → [4, 8] */
+    tl_graph_node* Q = tl_graph_matmul(g, input, Wq);
+    tl_graph_node* K = tl_graph_matmul(g, input, Wk);
+    tl_graph_node* V = tl_graph_matmul(g, input, Wv);
+
+    /* Attention scores: Q @ K^T → [4, 4]
+     * K^T: transpose [4, 8] → [8, 4]
+     * Q @ K^T: [4, 8] @ [8, 4] → [4, 4]
+     */
+    tl_graph_node* K_T = tl_graph_transpose(g, K, NULL);  /* Default transpose swaps last two dims */
+    tl_graph_node* scores = tl_graph_matmul(g, Q, K_T);
+
+    /* Apply softmax: [4, 4] */
+    tl_graph_node* attn_weights = tl_graph_softmax(g, scores, 1);  /* Softmax over last dim */
+
+    /* Output: attn_weights @ V → [4, 4] @ [4, 8] → [4, 8] */
+    tl_graph_node* output = tl_graph_matmul(g, attn_weights, V);
+
+    /* Verify output shape: [4, 8] */
+    assert(output->value->ndim == 2);
+    assert(output->value->dims[0] == seq_len);
+    assert(output->value->dims[1] == embed_dim);
+
+    printf("  Attention output shape: [%d, %d]\n",
+           output->value->dims[0], output->value->dims[1]);
+
+    tl_tensor_free(t_input);
+    tl_tensor_free(t_Wq);
+    tl_tensor_free(t_Wk);
+    tl_tensor_free(t_Wv);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
 }
