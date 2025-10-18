@@ -805,9 +805,16 @@ static void layer_norm_backward(tl_graph_node* node)
 
     /* Compute mean and variance (same as forward pass) */
     tl_tensor* mean = tl_tensor_meanreduce(x->value, NULL, axis);
+    tl_tensor* x_centered = tl_tensor_sub_broadcast(x->value, mean, NULL, axis);
 
-    /* Manually compute x_centered = x - mean (broadcast subtraction) */
-    tl_tensor* x_centered = tl_tensor_zeros(x->value->ndim, x->value->dims, x->value->dtype);
+    /* var = mean((x - mean)^2) */
+    tl_tensor* x_centered_sq = tl_tensor_elew(x_centered, x_centered, NULL, TL_MUL);
+    tl_tensor* var = tl_tensor_meanreduce(x_centered_sq, NULL, axis);
+
+    /* Normalize: x_norm = (x - mean) / sqrt(var + eps) */
+    int N = x->value->dims[axis];
+
+    /* Compute dimension strides for gradient calculations */
     int axis_size = x->value->dims[axis];
     int outer_size = 1;
     for (int i = 0; i < axis; i++) {
@@ -817,29 +824,6 @@ static void layer_norm_backward(tl_graph_node* node)
     for (int i = axis + 1; i < x->value->ndim; i++) {
         inner_size *= x->value->dims[i];
     }
-
-    for (int outer = 0; outer < outer_size; outer++) {
-        for (int inner = 0; inner < inner_size; inner++) {
-            int mean_idx = outer * inner_size + inner;
-            float mean_val;
-            TL_TENSOR_DATA_TO(mean, mean_idx, mean_val, TL_FLOAT);
-
-            for (int j = 0; j < axis_size; j++) {
-                int idx = outer * axis_size * inner_size + j * inner_size + inner;
-                float x_val;
-                TL_TENSOR_DATA_TO(x->value, idx, x_val, TL_FLOAT);
-                float centered = x_val - mean_val;
-                TL_TENSOR_DATA_FROM(x_centered, idx, centered, TL_FLOAT);
-            }
-        }
-    }
-
-    /* var = mean((x - mean)^2) */
-    tl_tensor* x_centered_sq = tl_tensor_elew(x_centered, x_centered, NULL, TL_MUL);
-    tl_tensor* var = tl_tensor_meanreduce(x_centered_sq, NULL, axis);
-
-    /* Normalize: x_norm = (x - mean) / sqrt(var + eps) */
-    int N = x->value->dims[axis];
 
     /* Gradient w.r.t. input */
     if (x->requires_grad) {

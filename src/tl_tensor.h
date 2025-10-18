@@ -82,6 +82,7 @@ void tl_tensor_reshape_src(tl_tensor *src, int ndim, const int *dims);
 tl_tensor *tl_tensor_maxreduce(const tl_tensor *src, tl_tensor *dst, tl_tensor *arg, int axis);
 tl_tensor *tl_tensor_sumreduce(const tl_tensor *src, tl_tensor *dst, int axis);
 tl_tensor *tl_tensor_meanreduce(const tl_tensor *src, tl_tensor *dst, int axis);
+tl_tensor *tl_tensor_sub_broadcast(const tl_tensor *src, const tl_tensor *reduced, tl_tensor *dst, int axis);
 tl_tensor *tl_tensor_softmax(const tl_tensor *src, tl_tensor *dst, int axis);
 tl_tensor *tl_tensor_layer_norm(const tl_tensor *src, tl_tensor *dst,
                                 const tl_tensor *gamma, const tl_tensor *beta,
