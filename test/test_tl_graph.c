@@ -362,6 +362,9 @@ void test_graph_composite()
     printf("  ✓ PASSED\n");
 }
 
+/* Forward declaration for Sprint 6 test */
+void test_mlp_xor();
+
 int main()
 {
     printf("============================================================\n");
@@ -404,8 +407,12 @@ int main()
     test_optimizer_sgd_momentum();
     test_training_loop();
 
+    printf("\nSprint 6: Integration Test - Simple MLP\n");
+    printf("-----------------------------------------\n");
+    test_mlp_xor();
+
     printf("\n============================================================\n");
-    printf("All tests passed! ✓ (Sprints 1-5 complete)\n");
+    printf("All tests passed! ✓ (Sprints 1-6 complete)\n");
     printf("============================================================\n");
 
     return 0;
@@ -873,4 +880,158 @@ void test_training_loop()
     /* TODO: graph_free hangs - needs investigation */
     // tl_graph_free(g);
     printf("  ✓ PASSED (parameters updated: w=%.2f, b=%.2f)\n", final_w, final_b);
+}
+
+/* ============================================================
+ * Sprint 6: Integration Test - Simple MLP
+ * ============================================================ */
+
+void test_mlp_xor()
+{
+    printf("Test: MLP training on XOR problem (2→4→1)...\n");
+
+    /* XOR dataset: [x1, x2] → y
+     * [0, 0] → 0
+     * [0, 1] → 1
+     * [1, 0] → 1
+     * [1, 1] → 0
+     */
+    float X_data[4][2] = {
+        {0.0f, 0.0f},
+        {0.0f, 1.0f},
+        {1.0f, 0.0f},
+        {1.0f, 1.0f}
+    };
+    float y_data[4] = {0.0f, 1.0f, 1.0f, 0.0f};
+    int num_samples = 4;
+
+    tl_graph* g = tl_graph_create();
+
+    /* Network architecture: 2 → 4 → 1 */
+    int input_dim = 2;
+    int hidden_dim = 4;
+    int output_dim = 1;
+
+    /* Initialize parameters with small random values */
+    float W1_data[2*4] = {0.5f, -0.3f, 0.2f, 0.1f,
+                          -0.4f, 0.6f, -0.1f, 0.3f};
+    float b1_data[4] = {0.1f, -0.1f, 0.2f, -0.2f};
+    float W2_data[4*1] = {0.5f, -0.5f, 0.3f, -0.3f};
+    float b2_data[1] = {0.1f};
+
+    tl_tensor* t_W1 = tl_tensor_create(W1_data, 2, (int[]){2, 4}, TL_FLOAT);
+    tl_tensor* t_b1 = tl_tensor_create(b1_data, 1, (int[]){4}, TL_FLOAT);
+    tl_tensor* t_W2 = tl_tensor_create(W2_data, 2, (int[]){4, 1}, TL_FLOAT);
+    tl_tensor* t_b2 = tl_tensor_create(b2_data, 1, (int[]){1}, TL_FLOAT);
+
+    tl_graph_node* W1 = tl_graph_param(g, t_W1);
+    tl_graph_node* b1 = tl_graph_param(g, t_b1);
+    tl_graph_node* W2 = tl_graph_param(g, t_W2);
+    tl_graph_node* b2 = tl_graph_param(g, t_b2);
+
+    /* Create optimizer */
+    tl_optimizer* opt = tl_optimizer_sgd_create(g, 0.1);
+
+    /* Store initial loss for comparison */
+    float initial_loss = 0.0f;
+
+    /* Compute initial predictions and loss */
+    for (int i = 0; i < num_samples; i++) {
+        tl_tensor* t_x = tl_tensor_create(X_data[i], 1, (int[]){2}, TL_FLOAT);
+        tl_graph_node* x = tl_graph_input(g, t_x);
+
+        /* Forward: hidden = ReLU(x @ W1 + b1) */
+        tl_graph_node* h1 = tl_graph_matmul(g, x, W1);
+        tl_graph_node* h1_bias = tl_graph_add(g, h1, b1);
+        tl_graph_node* hidden = tl_graph_relu(g, h1_bias);
+
+        /* Forward: output = hidden @ W2 + b2 */
+        tl_graph_node* o1 = tl_graph_matmul(g, hidden, W2);
+        tl_graph_node* output = tl_graph_add(g, o1, b2);
+
+        float pred;
+        TL_TENSOR_DATA_TO(output->value, 0, pred, TL_FLOAT);
+        float error = pred - y_data[i];
+        initial_loss += error * error;
+
+        tl_tensor_free(t_x);
+    }
+    initial_loss /= num_samples;
+    printf("  Initial loss: %.4f\n", initial_loss);
+
+    /* Train for a few iterations */
+    for (int iter = 0; iter < 20; iter++) {
+        float epoch_loss = 0.0f;
+
+        for (int i = 0; i < num_samples; i++) {
+            tl_optimizer_zero_grad(opt);
+
+            tl_tensor* t_x = tl_tensor_create(X_data[i], 1, (int[]){2}, TL_FLOAT);
+            tl_graph_node* x = tl_graph_input(g, t_x);
+
+            /* Forward pass */
+            tl_graph_node* h1 = tl_graph_matmul(g, x, W1);
+            tl_graph_node* h1_bias = tl_graph_add(g, h1, b1);
+            tl_graph_node* hidden = tl_graph_relu(g, h1_bias);
+            tl_graph_node* o1 = tl_graph_matmul(g, hidden, W2);
+            tl_graph_node* output = tl_graph_add(g, o1, b2);
+
+            /* Compute loss: MSE */
+            float pred;
+            TL_TENSOR_DATA_TO(output->value, 0, pred, TL_FLOAT);
+            float error = pred - y_data[i];
+            float loss = error * error;
+            epoch_loss += loss;
+
+            /* Backward pass: grad = 2 * (pred - target) */
+            output->grad = tl_tensor_create((float[]){2.0f * error}, 1, (int[]){1}, TL_FLOAT);
+            tl_graph_backward(g, output);
+
+            /* Update parameters */
+            tl_optimizer_step(opt);
+
+            tl_tensor_free(t_x);
+        }
+
+        epoch_loss /= num_samples;
+        if (iter % 5 == 0) {
+            printf("  Epoch %d: loss = %.4f\n", iter, epoch_loss);
+        }
+    }
+
+    /* Compute final loss */
+    float final_loss = 0.0f;
+    for (int i = 0; i < num_samples; i++) {
+        tl_tensor* t_x = tl_tensor_create(X_data[i], 1, (int[]){2}, TL_FLOAT);
+        tl_graph_node* x = tl_graph_input(g, t_x);
+
+        tl_graph_node* h1 = tl_graph_matmul(g, x, W1);
+        tl_graph_node* h1_bias = tl_graph_add(g, h1, b1);
+        tl_graph_node* hidden = tl_graph_relu(g, h1_bias);
+        tl_graph_node* o1 = tl_graph_matmul(g, hidden, W2);
+        tl_graph_node* output = tl_graph_add(g, o1, b2);
+
+        float pred;
+        TL_TENSOR_DATA_TO(output->value, 0, pred, TL_FLOAT);
+        float error = pred - y_data[i];
+        final_loss += error * error;
+
+        tl_tensor_free(t_x);
+    }
+    final_loss /= num_samples;
+    printf("  Final loss: %.4f\n", final_loss);
+
+    /* Verify loss decreased */
+    assert(final_loss < initial_loss);
+    assert(final_loss < 0.3f);  /* Should achieve reasonable convergence */
+
+    tl_tensor_free(t_W1);
+    tl_tensor_free(t_b1);
+    tl_tensor_free(t_W2);
+    tl_tensor_free(t_b2);
+    tl_optimizer_free(opt);
+    /* Skip graph_free due to known issue */
+    // tl_graph_free(g);
+
+    printf("  ✓ PASSED (loss: %.4f → %.4f)\n", initial_loss, final_loss);
 }
