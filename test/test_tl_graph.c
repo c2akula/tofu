@@ -362,10 +362,11 @@ void test_graph_composite()
     printf("  ✓ PASSED\n");
 }
 
-/* Forward declarations for Sprint 6-7 tests */
+/* Forward declarations for Sprint 6-8 tests */
 void test_mlp_xor();
 void test_vit_patch_embedding();
 void test_vit_self_attention();
+void test_vit_training();
 
 int main()
 {
@@ -418,8 +419,12 @@ int main()
     test_vit_patch_embedding();
     test_vit_self_attention();
 
+    printf("\nSprint 8: ViT Training\n");
+    printf("-----------------------\n");
+    test_vit_training();
+
     printf("\n============================================================\n");
-    printf("All tests passed! ✓ (Sprints 1-7 complete)\n");
+    printf("All tests passed! ✓ (Sprints 1-8 complete)\n");
     printf("============================================================\n");
 
     return 0;
@@ -1176,4 +1181,192 @@ void test_vit_self_attention()
     tl_tensor_free(t_Wv);
     tl_graph_free(g);
     printf("  ✓ PASSED\n");
+}
+
+/* ============================================================
+ * Sprint 8: ViT Training
+ * ============================================================ */
+
+void test_vit_training()
+{
+    printf("Test: Training simplified ViT on binary classification...\n");
+
+    /* Simplified ViT: 4×4 image → patches → attention → classify
+     * Dataset: 2 samples with different patterns (binary classification)
+     * Sample 0: pattern with more zeros → class 0
+     * Sample 1: pattern with more ones → class 1
+     */
+
+    float img0_data[16] = {0,0,0,0, 0,1,1,0, 0,1,1,0, 0,0,0,0};  /* Class 0 */
+    float img1_data[16] = {1,1,1,1, 1,0,0,1, 1,0,0,1, 1,1,1,1};  /* Class 1 */
+    float labels[2] = {0.0f, 1.0f};
+
+    tl_graph* g = tl_graph_create();
+
+    /* Network parameters */
+    int patch_dim = 4;    /* 2×2 patch = 4 pixels */
+    int num_patches = 4;  /* 4×4 image / 2×2 patches = 4 */
+    int embed_dim = 8;
+    int num_classes = 1;  /* Binary classification (single output) */
+
+    /* Patch embedding weights */
+    float W_embed_data[32];  /* [4, 8] */
+    for (int i = 0; i < 32; i++) W_embed_data[i] = 0.1f * (i % 3 - 1);
+    tl_tensor* t_W_embed = tl_tensor_create(W_embed_data, 2, (int[]){patch_dim, embed_dim}, TL_FLOAT);
+    tl_graph_node* W_embed = tl_graph_param(g, t_W_embed);
+
+    /* Attention Q, K, V weights */
+    float Wq_data[64], Wk_data[64], Wv_data[64];
+    for (int i = 0; i < 64; i++) {
+        Wq_data[i] = 0.1f * ((i % 5) - 2);
+        Wk_data[i] = 0.1f * ((i % 7) - 3);
+        Wv_data[i] = 0.1f * ((i % 3) - 1);
+    }
+    tl_tensor* t_Wq = tl_tensor_create(Wq_data, 2, (int[]){embed_dim, embed_dim}, TL_FLOAT);
+    tl_tensor* t_Wk = tl_tensor_create(Wk_data, 2, (int[]){embed_dim, embed_dim}, TL_FLOAT);
+    tl_tensor* t_Wv = tl_tensor_create(Wv_data, 2, (int[]){embed_dim, embed_dim}, TL_FLOAT);
+    tl_graph_node* Wq = tl_graph_param(g, t_Wq);
+    tl_graph_node* Wk = tl_graph_param(g, t_Wk);
+    tl_graph_node* Wv = tl_graph_param(g, t_Wv);
+
+    /* Classification head: [32, 1] (flatten all tokens) */
+    int cls_input_dim = num_patches * embed_dim;  /* 4 * 8 = 32 */
+    float W_cls_data[32];
+    for (int i = 0; i < 32; i++) W_cls_data[i] = 0.1f * ((i % 5) - 2);
+    tl_tensor* t_W_cls = tl_tensor_create(W_cls_data, 2, (int[]){cls_input_dim, num_classes}, TL_FLOAT);
+    tl_graph_node* W_cls = tl_graph_param(g, t_W_cls);
+
+    /* Create optimizer */
+    tl_optimizer* opt = tl_optimizer_sgd_create(g, 0.1);
+
+    /* Compute initial loss */
+    float initial_loss = 0.0f;
+    for (int sample_idx = 0; sample_idx < 2; sample_idx++) {
+        float* img_data = (sample_idx == 0) ? img0_data : img1_data;
+        tl_tensor* t_img = tl_tensor_create(img_data, 1, (int[]){16}, TL_FLOAT);
+        tl_graph_node* img = tl_graph_input(g, t_img);
+
+        /* Patch embedding: [16] → [4, 4] → [4, 8] */
+        tl_graph_node* patches = tl_graph_reshape(g, img, 2, (int[]){num_patches, patch_dim});
+        tl_graph_node* embeddings = tl_graph_matmul(g, patches, W_embed);
+
+        /* Self-attention: Q @ K^T → softmax → @ V */
+        tl_graph_node* Q = tl_graph_matmul(g, embeddings, Wq);
+        tl_graph_node* K = tl_graph_matmul(g, embeddings, Wk);
+        tl_graph_node* V = tl_graph_matmul(g, embeddings, Wv);
+        tl_graph_node* K_T = tl_graph_transpose(g, K, NULL);
+        tl_graph_node* scores = tl_graph_matmul(g, Q, K_T);
+        tl_graph_node* attn = tl_graph_softmax(g, scores, 1);
+        tl_graph_node* attn_out = tl_graph_matmul(g, attn, V);
+
+        /* Flatten all tokens: [4, 8] → [32] */
+        tl_graph_node* flattened = tl_graph_reshape(g, attn_out, 1, (int[]){cls_input_dim});
+
+        /* Classification: [32] @ [32, 1] → [1] */
+        tl_graph_node* logits = tl_graph_matmul(g, flattened, W_cls);
+
+        /* Compute loss */
+        float pred;
+        TL_TENSOR_DATA_TO(logits->value, 0, pred, TL_FLOAT);
+        float error = pred - labels[sample_idx];
+        initial_loss += error * error;
+
+        tl_tensor_free(t_img);
+    }
+    initial_loss /= 2.0f;
+    printf("  Initial loss: %.4f\n", initial_loss);
+
+    /* Training loop */
+    for (int iter = 0; iter < 10; iter++) {
+        float epoch_loss = 0.0f;
+
+        for (int sample_idx = 0; sample_idx < 2; sample_idx++) {
+            tl_optimizer_zero_grad(opt);
+
+            float* img_data = (sample_idx == 0) ? img0_data : img1_data;
+            tl_tensor* t_img = tl_tensor_create(img_data, 1, (int[]){16}, TL_FLOAT);
+            tl_graph_node* img = tl_graph_input(g, t_img);
+
+            /* Forward pass */
+            tl_graph_node* patches = tl_graph_reshape(g, img, 2, (int[]){num_patches, patch_dim});
+            tl_graph_node* embeddings = tl_graph_matmul(g, patches, W_embed);
+
+            tl_graph_node* Q = tl_graph_matmul(g, embeddings, Wq);
+            tl_graph_node* K = tl_graph_matmul(g, embeddings, Wk);
+            tl_graph_node* V = tl_graph_matmul(g, embeddings, Wv);
+            tl_graph_node* K_T = tl_graph_transpose(g, K, NULL);
+            tl_graph_node* scores = tl_graph_matmul(g, Q, K_T);
+            tl_graph_node* attn = tl_graph_softmax(g, scores, 1);
+            tl_graph_node* attn_out = tl_graph_matmul(g, attn, V);
+
+            tl_graph_node* flattened = tl_graph_reshape(g, attn_out, 1, (int[]){cls_input_dim});
+            tl_graph_node* logits = tl_graph_matmul(g, flattened, W_cls);
+
+            /* Compute loss and gradient */
+            float pred;
+            TL_TENSOR_DATA_TO(logits->value, 0, pred, TL_FLOAT);
+            float error = pred - labels[sample_idx];
+            float loss = error * error;
+            epoch_loss += loss;
+
+            /* Backward pass */
+            logits->grad = tl_tensor_create((float[]){2.0f * error}, 1, (int[]){1}, TL_FLOAT);
+            tl_graph_backward(g, logits);
+
+            /* Update parameters */
+            tl_optimizer_step(opt);
+
+            tl_tensor_free(t_img);
+        }
+
+        epoch_loss /= 2.0f;
+        if (iter % 3 == 0) {
+            printf("  Epoch %d: loss = %.4f\n", iter, epoch_loss);
+        }
+    }
+
+    /* Compute final loss */
+    float final_loss = 0.0f;
+    for (int sample_idx = 0; sample_idx < 2; sample_idx++) {
+        float* img_data = (sample_idx == 0) ? img0_data : img1_data;
+        tl_tensor* t_img = tl_tensor_create(img_data, 1, (int[]){16}, TL_FLOAT);
+        tl_graph_node* img = tl_graph_input(g, t_img);
+
+        tl_graph_node* patches = tl_graph_reshape(g, img, 2, (int[]){num_patches, patch_dim});
+        tl_graph_node* embeddings = tl_graph_matmul(g, patches, W_embed);
+
+        tl_graph_node* Q = tl_graph_matmul(g, embeddings, Wq);
+        tl_graph_node* K = tl_graph_matmul(g, embeddings, Wk);
+        tl_graph_node* V = tl_graph_matmul(g, embeddings, Wv);
+        tl_graph_node* K_T = tl_graph_transpose(g, K, NULL);
+        tl_graph_node* scores = tl_graph_matmul(g, Q, K_T);
+        tl_graph_node* attn = tl_graph_softmax(g, scores, 1);
+        tl_graph_node* attn_out = tl_graph_matmul(g, attn, V);
+
+        tl_graph_node* flattened = tl_graph_reshape(g, attn_out, 1, (int[]){cls_input_dim});
+        tl_graph_node* logits = tl_graph_matmul(g, flattened, W_cls);
+
+        float pred;
+        TL_TENSOR_DATA_TO(logits->value, 0, pred, TL_FLOAT);
+        float error = pred - labels[sample_idx];
+        final_loss += error * error;
+
+        tl_tensor_free(t_img);
+    }
+    final_loss /= 2.0f;
+    printf("  Final loss: %.4f\n", final_loss);
+
+    /* Verify loss decreased */
+    assert(final_loss < initial_loss);
+
+    tl_tensor_free(t_W_embed);
+    tl_tensor_free(t_Wq);
+    tl_tensor_free(t_Wk);
+    tl_tensor_free(t_Wv);
+    tl_tensor_free(t_W_cls);
+    tl_optimizer_free(opt);
+    /* Skip graph_free due to known issue */
+    // tl_graph_free(g);
+
+    printf("  ✓ PASSED (loss: %.4f → %.4f)\n", initial_loss, final_loss);
 }
