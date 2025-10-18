@@ -475,3 +475,239 @@ TL_EXPORT tl_graph_node* tl_graph_transpose(tl_graph* g, tl_graph_node* x, const
 
     return node;
 }
+
+/* ========================================================================
+ * Backward Pass Implementation
+ * ======================================================================== */
+
+/* Topological sort using DFS */
+static void topo_sort_dfs(tl_graph_node* node, tl_graph* g)
+{
+    if (node->visited)
+        return;
+
+    node->visited = 1;
+
+    /* Visit all inputs first */
+    for (int i = 0; i < node->num_inputs; i++) {
+        topo_sort_dfs(node->inputs[i], g);
+    }
+
+    /* Add to topological order */
+    if (g->topo_size >= g->topo_capacity) {
+        int new_capacity = g->topo_capacity * 2;
+        tl_graph_node** new_order = (tl_graph_node**)realloc(
+            g->topo_order, new_capacity * sizeof(tl_graph_node*));
+        if (!new_order)
+            return;
+        g->topo_order = new_order;
+        g->topo_capacity = new_capacity;
+    }
+
+    g->topo_order[g->topo_size++] = node;
+}
+
+/* Build topological order for backward pass */
+static void tl_graph_build_topo(tl_graph* g, tl_graph_node* root)
+{
+    /* Reset visited flags */
+    for (int i = 0; i < g->num_nodes; i++) {
+        g->nodes[i]->visited = 0;
+    }
+
+    /* Build topological order */
+    g->topo_size = 0;
+    topo_sort_dfs(root, g);
+}
+
+/* Helper: Accumulate gradient (add to existing gradient) */
+static void accumulate_grad(tl_graph_node* node, tl_tensor* grad_contrib)
+{
+    if (!node->requires_grad)
+        return;
+
+    if (!node->grad) {
+        /* First gradient contribution - just store it */
+        node->grad = tl_tensor_clone(grad_contrib);
+    } else {
+        /* Accumulate (add to existing gradient) */
+        tl_tensor* new_grad = tl_tensor_elew_broadcast(node->grad, grad_contrib, NULL, TL_SUM);
+        tl_tensor_free_data_too(node->grad);
+        node->grad = new_grad;
+    }
+}
+
+/* Backward functions for each operation */
+
+/* Matmul backward: y = A @ B */
+static void matmul_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_MATMUL);
+    assert(node->num_inputs == 2);
+
+    tl_graph_node* A = node->inputs[0];
+    tl_graph_node* B = node->inputs[1];
+    tl_tensor* grad_y = node->grad;
+
+    if (!grad_y)
+        return;
+
+    /* ∂L/∂A = (∂L/∂y) @ B^T */
+    if (A->requires_grad) {
+        tl_tensor* B_T = tl_tensor_transpose(B->value, NULL, NULL);
+        tl_tensor* grad_A = tl_tensor_matmul(grad_y, B_T, NULL);
+        accumulate_grad(A, grad_A);
+        tl_tensor_free_data_too(B_T);
+        tl_tensor_free_data_too(grad_A);
+    }
+
+    /* ∂L/∂B = A^T @ (∂L/∂y) */
+    if (B->requires_grad) {
+        tl_tensor* A_T = tl_tensor_transpose(A->value, NULL, NULL);
+        tl_tensor* grad_B = tl_tensor_matmul(A_T, grad_y, NULL);
+        accumulate_grad(B, grad_B);
+        tl_tensor_free_data_too(A_T);
+        tl_tensor_free_data_too(grad_B);
+    }
+}
+
+/* Add backward: z = x + y */
+static void add_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_ADD);
+    assert(node->num_inputs == 2);
+
+    tl_graph_node* x = node->inputs[0];
+    tl_graph_node* y = node->inputs[1];
+    tl_tensor* grad_z = node->grad;
+
+    if (!grad_z)
+        return;
+
+    /* ∂L/∂x = ∂L/∂z (sum over broadcast dimensions if needed) */
+    if (x->requires_grad) {
+        /* TODO: Handle broadcasting properly - for now assume same shape */
+        accumulate_grad(x, grad_z);
+    }
+
+    /* ∂L/∂y = ∂L/∂z */
+    if (y->requires_grad) {
+        accumulate_grad(y, grad_z);
+    }
+}
+
+/* Mul backward: z = x * y */
+static void mul_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_MUL);
+    assert(node->num_inputs == 2);
+
+    tl_graph_node* x = node->inputs[0];
+    tl_graph_node* y = node->inputs[1];
+    tl_tensor* grad_z = node->grad;
+
+    if (!grad_z)
+        return;
+
+    /* ∂L/∂x = ∂L/∂z * y */
+    if (x->requires_grad) {
+        tl_tensor* grad_x = tl_tensor_elew_broadcast(grad_z, y->value, NULL, TL_MUL);
+        accumulate_grad(x, grad_x);
+        tl_tensor_free_data_too(grad_x);
+    }
+
+    /* ∂L/∂y = ∂L/∂z * x */
+    if (y->requires_grad) {
+        tl_tensor* grad_y = tl_tensor_elew_broadcast(grad_z, x->value, NULL, TL_MUL);
+        accumulate_grad(y, grad_y);
+        tl_tensor_free_data_too(grad_y);
+    }
+}
+
+/* ReLU backward: y = max(0, x) */
+static void relu_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_RELU);
+    assert(node->num_inputs == 1);
+
+    tl_graph_node* x = node->inputs[0];
+    tl_tensor* grad_y = node->grad;
+
+    if (!grad_y || !x->requires_grad)
+        return;
+
+    /* ∂L/∂x = ∂L/∂y * (x > 0) */
+    tl_tensor* grad_x = tl_tensor_zeros(x->value->ndim, x->value->dims, x->value->dtype);
+
+    for (int i = 0; i < x->value->len; i++) {
+        float x_val, grad_y_val;
+        TL_TENSOR_DATA_TO(x->value, i, x_val, TL_FLOAT);
+        TL_TENSOR_DATA_TO(grad_y, i, grad_y_val, TL_FLOAT);
+
+        /* Gradient passes through only if x > 0 */
+        float grad = (x_val > 0.0f) ? grad_y_val : 0.0f;
+        TL_TENSOR_DATA_FROM(grad_x, i, grad, TL_FLOAT);
+    }
+
+    accumulate_grad(x, grad_x);
+    tl_tensor_free_data_too(grad_x);
+}
+
+/* Assign backward functions to nodes */
+static void assign_backward_fn(tl_graph_node* node)
+{
+    switch (node->op) {
+        case TL_OP_MATMUL:
+            node->backward_fn = matmul_backward;
+            break;
+        case TL_OP_ADD:
+            node->backward_fn = add_backward;
+            break;
+        case TL_OP_MUL:
+            node->backward_fn = mul_backward;
+            break;
+        case TL_OP_RELU:
+            node->backward_fn = relu_backward;
+            break;
+        case TL_OP_INPUT:
+        case TL_OP_PARAM:
+            /* Leaf nodes have no backward */
+            node->backward_fn = NULL;
+            break;
+        default:
+            /* Not implemented yet */
+            node->backward_fn = NULL;
+            break;
+    }
+}
+
+/* Main backward pass */
+TL_EXPORT void tl_graph_backward(tl_graph* g, tl_graph_node* loss)
+{
+    assert(g && loss);
+
+    /* Build topological order */
+    tl_graph_build_topo(g, loss);
+
+    /* Assign backward functions */
+    for (int i = 0; i < g->topo_size; i++) {
+        assign_backward_fn(g->topo_order[i]);
+    }
+
+    /* Initialize loss gradient to 1.0 (dL/dL = 1) */
+    if (!loss->grad) {
+        loss->grad = tl_tensor_zeros(loss->value->ndim, loss->value->dims, loss->value->dtype);
+        for (int i = 0; i < loss->grad->len; i++) {
+            float one = 1.0f;
+            TL_TENSOR_DATA_FROM(loss->grad, i, one, TL_FLOAT);
+        }
+    }
+
+    /* Traverse in reverse topological order */
+    for (int i = g->topo_size - 1; i >= 0; i--) {
+        tl_graph_node* node = g->topo_order[i];
+        if (node->backward_fn && node->grad) {
+            node->backward_fn(node);
+        }
+    }
+}
