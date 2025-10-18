@@ -1,5 +1,14 @@
 # Tofu
-Tofu is a light-weight tensor operation library for C with broadcasting support.
+
+Tofu is a lightweight, NumPy-compatible tensor operation library for C with comprehensive broadcasting support. It provides essential linear algebra operations (inner product, matrix multiplication, outer product) optimized for embedded systems and environments where Python/NumPy isn't available.
+
+**Key Features:**
+- ✅ NumPy-compatible API (inner, matmul, outer)
+- ✅ Broadcasting semantics for element-wise operations
+- ✅ Support for multiple data types (int8, int16, int32, float32, etc.)
+- ✅ Zero external dependencies (pure C)
+- ✅ ESP32 cross-compilation support
+- ✅ Comprehensive test coverage (63+ tests)
 
 ## Prerequisites
 The following steps have been tested for Ubuntu 16.04 but should work with
@@ -123,5 +132,134 @@ tl_tensor *t2 = tl_tensor_create(arr2, 2, (int[]){2, 1}, TL_FLOAT);
 tl_tensor *result = tl_tensor_elew_broadcast(t1, t2, NULL, TL_MUL);
 // result will have shape [2, 3] and values [[10, 20, 30], [20, 40, 60]]
 ```
+
+## Tensor Operations
+
+Tofu provides NumPy-compatible tensor operations for linear algebra and tensor manipulation.
+
+### Inner Product
+
+Computes the inner product (sum-product over last axes) with cartesian product semantics.
+
+```c
+tl_tensor *tl_tensor_inner(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+```
+
+**Behavior:**
+- 1-D × 1-D: Dot product → scalar
+- 2-D × 2-D: `result[i,j] = sum(a[i,:] * b[j,:])`
+- N-D × N-D: Cartesian product of non-last dimensions
+
+**Output shape:** `(*a.shape[:-1], *b.shape[:-1])`
+
+**Example:**
+```c
+// Vector dot product
+float a[] = {1, 2, 3};
+float b[] = {4, 5, 6};
+tl_tensor *v1 = tl_tensor_create(a, 1, (int[]){3}, TL_FLOAT);
+tl_tensor *v2 = tl_tensor_create(b, 1, (int[]){3}, TL_FLOAT);
+tl_tensor *result = tl_tensor_inner(v1, v2, NULL);
+// result: scalar 32.0 (1*4 + 2*5 + 3*6)
+
+// Matrix inner product [2,3] × [2,3] → [2,2]
+float mat1[] = {1, 2, 3, 4, 5, 6};
+float mat2[] = {1, 1, 1, 2, 2, 2};
+tl_tensor *m1 = tl_tensor_create(mat1, 2, (int[]){2, 3}, TL_FLOAT);
+tl_tensor *m2 = tl_tensor_create(mat2, 2, (int[]){2, 3}, TL_FLOAT);
+result = tl_tensor_inner(m1, m2, NULL);
+// result[i,j] = sum(m1[i,:] * m2[j,:])
+```
+
+### Matrix Multiplication (matmul)
+
+Computes matrix multiplication with broadcasting on batch dimensions.
+
+```c
+tl_tensor *tl_tensor_matmul(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+```
+
+**Behavior:**
+- 1-D @ 1-D: Dot product → scalar
+- 2-D @ 2-D: Standard matrix multiplication
+- N-D @ 1-D: Matrix-vector, drops last dimension
+- 1-D @ N-D: Vector-matrix, drops first dimension
+- N-D @ N-D: Batch matrix multiplication with broadcasting
+
+**Output shape:** Broadcasts batch dimensions, contracts last of a with second-to-last of b
+
+**Example:**
+```c
+// Standard matrix multiplication [2,3] @ [3,2] → [2,2]
+float a[] = {1, 2, 3, 4, 5, 6};
+float b[] = {1, 1, 2, 2, 3, 3};
+tl_tensor *m1 = tl_tensor_create(a, 2, (int[]){2, 3}, TL_FLOAT);
+tl_tensor *m2 = tl_tensor_create(b, 2, (int[]){3, 2}, TL_FLOAT);
+tl_tensor *result = tl_tensor_matmul(m1, m2, NULL);
+// Standard matrix multiply: result[i,j] = sum(m1[i,:] * m2[:,j])
+
+// Batch matrix multiplication with broadcasting [3,4] @ [2,4,5] → [2,3,5]
+// The [3,4] matrix is broadcast across 2 batches
+```
+
+### Outer Product
+
+Computes the outer product (cartesian product without summation).
+
+```c
+tl_tensor *tl_tensor_outer(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+```
+
+**Behavior:**
+- Flattens both input tensors
+- Computes: `result[i,j] = a[i] * b[j]`
+- Always produces 2-D output
+
+**Output shape:** `[a.size, b.size]` where size is total element count
+
+**Example:**
+```c
+// Vector outer product [3] outer [4] → [3,4]
+float a[] = {1, 2, 3};
+float b[] = {4, 5, 6, 7};
+tl_tensor *v1 = tl_tensor_create(a, 1, (int[]){3}, TL_FLOAT);
+tl_tensor *v2 = tl_tensor_create(b, 1, (int[]){4}, TL_FLOAT);
+tl_tensor *result = tl_tensor_outer(v1, v2, NULL);
+// result[i,j] = a[i] * b[j]
+// [[4,  5,  6,  7],
+//  [8, 10, 12, 14],
+//  [12, 15, 18, 21]]
+
+// Multi-dimensional inputs are flattened first
+// [2,2] outer [2] → flatten to [4] outer [2] → [4,2]
+```
+
+### Comparison: inner vs matmul vs outer
+
+| Operation | 1-D × 1-D | 2-D × 2-D | N-D Behavior | Use Case |
+|-----------|-----------|-----------|--------------|----------|
+| **inner** | Dot product (scalar) | Sum over last of both | Cartesian product | Generalized inner products |
+| **matmul** | Dot product (scalar) | Matrix multiplication | Broadcasting batch dims | Deep learning, batch ops |
+| **outer** | Outer product [m,n] | Flattens first [m²,n²] | Always flattens | Tensor products |
+
+**Key Differences:**
+- **inner**: Cartesian product of non-last dimensions (independent indices)
+- **matmul**: Broadcasting of batch dimensions (shared indices) - most efficient for batches
+- **outer**: No summation, always produces 2-D output
+
+### Pre-allocated Destinations
+
+All tensor operations accept an optional pre-allocated destination tensor:
+
+```c
+// Create destination tensor first
+tl_tensor *dst = tl_tensor_zeros(2, (int[]){2, 2}, TL_FLOAT);
+
+// Use pre-allocated destination
+tl_tensor *result = tl_tensor_matmul(m1, m2, dst);
+// result points to dst (reused)
+```
+
+This avoids memory allocation overhead in performance-critical loops.
 
 Additional documentation is coming soon. But the API should be familiar if you have experience with `numpy` in Python.
