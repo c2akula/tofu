@@ -1280,6 +1280,155 @@ LN_TEST_START(test_tl_tensor_broadcasting_edge_cases)
     tl_tensor_free(src2);
 }
 LN_TEST_END
+
+LN_TEST_START(test_tl_tensor_matmul)
+{
+    tl_tensor *src1, *src2, *dst;
+
+    /* Test case 1: 1-D @ 1-D -> scalar (dot product) */
+    int32_t vec1_data[3] = {1, 2, 3};
+    int32_t vec2_data[3] = {4, 5, 6};
+    src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+    src2 = tl_tensor_create(vec2_data, 1, ARR(int, 3), TL_INT32);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 2: 2-D @ 2-D -> matrix multiplication [2,3] @ [3,2] -> [2,2] */
+    int32_t mat1_data[6] = {1, 2, 3, 4, 5, 6};
+    int32_t mat2_data[6] = {1, 1, 2, 2, 3, 3};
+    int32_t expected_2x2[4] = {14, 14, 32, 32};
+    src1 = tl_tensor_create(mat1_data, 2, ARR(int, 2, 3), TL_INT32);
+    src2 = tl_tensor_create(mat2_data, 2, ARR(int, 3, 2), TL_INT32);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 2);
+    for (int i = 0; i < 4; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_2x2[i]);
+    }
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 3: 2-D @ 1-D -> matrix-vector [2,3] @ [3] -> [2] */
+    src1 = tl_tensor_create(mat1_data, 2, ARR(int, 2, 3), TL_INT32);
+    src2 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 14);
+    ck_assert_int_eq(((int32_t*)dst->data)[1], 32);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 4: 1-D @ 2-D -> vector-matrix [3] @ [3,2] -> [2] */
+    src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+    src2 = tl_tensor_create(mat2_data, 2, ARR(int, 3, 2), TL_INT32);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 14);
+    ck_assert_int_eq(((int32_t*)dst->data)[1], 14);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 5: 3-D @ 3-D -> batch matmul [2,3,4] @ [2,4,5] -> [2,3,5] */
+    float batch1_data[24];
+    for (int i = 0; i < 24; i++) batch1_data[i] = i + 1.0f;
+    float batch2_data[40];
+    for (int i = 0; i < 40; i++) batch2_data[i] = 1.0f;
+
+    src1 = tl_tensor_create(batch1_data, 3, ARR(int, 2, 3, 4), TL_FLOAT);
+    src2 = tl_tensor_create(batch2_data, 3, ARR(int, 2, 4, 5), TL_FLOAT);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->dims[2], 5);
+    // First element: sum(1,2,3,4) = 10
+    ck_assert(fabsf(((float*)dst->data)[0] - 10.0f) < 1e-5);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 6: Broadcasting [3,4] @ [2,4,5] -> [2,3,5] */
+    float mat_data[12];
+    for (int i = 0; i < 12; i++) mat_data[i] = i + 1.0f;
+
+    src1 = tl_tensor_create(mat_data, 2, ARR(int, 3, 4), TL_FLOAT);
+    src2 = tl_tensor_create(batch2_data, 3, ARR(int, 2, 4, 5), TL_FLOAT);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->dims[2], 5);
+    // Both batches should have same result (broadcasting)
+    ck_assert(fabsf(((float*)dst->data)[0] - 10.0f) < 1e-5);
+    ck_assert(fabsf(((float*)dst->data)[15] - 10.0f) < 1e-5); // Second batch first element
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 7: Edge case - single element matrices [2,1,1] @ [2,1,1] -> [2,1,1] */
+    int32_t single1_data[2] = {5, 10};
+    int32_t single2_data[2] = {2, 3};
+    src1 = tl_tensor_create(single1_data, 3, ARR(int, 2, 1, 1), TL_INT32);
+    src2 = tl_tensor_create(single2_data, 3, ARR(int, 2, 1, 1), TL_INT32);
+    dst = tl_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 1);
+    ck_assert_int_eq(dst->dims[2], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 10);
+    ck_assert_int_eq(((int32_t*)dst->data)[1], 30);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+
+    /* Test case 8: Pre-allocated destination tensor */
+    src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+    src2 = tl_tensor_create(vec2_data, 1, ARR(int, 3), TL_INT32);
+    dst = tl_tensor_zeros(1, ARR(int, 1), TL_INT32);
+    dst = tl_tensor_matmul(src1, src2, dst);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+    tl_tensor_free(src1);
+    tl_tensor_free(src2);
+    tl_tensor_free_data_too(dst);
+}
+LN_TEST_END
 /* end of tests */
 
 LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
@@ -1303,6 +1452,7 @@ LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
     LN_TEST_ADD_TEST(test_tl_tensor_elew);
     LN_TEST_ADD_TEST(test_tl_tensor_elew_param);
     LN_TEST_ADD_TEST(test_tl_tensor_inner);
+    LN_TEST_ADD_TEST(test_tl_tensor_matmul);
     LN_TEST_ADD_TEST(test_tl_tensor_transpose);
     LN_TEST_ADD_TEST(test_tl_tensor_lrelu);
     LN_TEST_ADD_TEST(test_tl_tensor_convert);
