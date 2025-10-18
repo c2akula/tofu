@@ -582,32 +582,45 @@ LN_TEST_START(test_tl_tensor_elew_param)
 }
 LN_TEST_END
 
-LN_TEST_START(test_tl_tensor_dot_product)
+/* Replaced by test_tl_tensor_inner */
+
+LN_TEST_START(test_tl_tensor_inner)
 {
      tl_tensor *src1, *src2, *dst;
      int8_t src1_data[6] = {1, 1, 2, 2, 3, 3};
      int8_t src2_data[6] = {1, 2, 3, 4, 5, 6};
-     int8_t dst_data[1] = {50};
+     /* NumPy-compatible inner product for [2,3] x [2,3]:
+      * Output shape: [2,2] (cartesian product over non-last dimensions)
+      * result[i,j] = inner_product(src1[i,:], src2[j,:])
+      * result[0,0] = 1*1 + 1*2 + 2*3 = 9
+      * result[0,1] = 1*4 + 1*5 + 2*6 = 21
+      * result[1,0] = 2*1 + 3*2 + 3*3 = 17
+      * result[1,1] = 2*4 + 3*5 + 3*6 = 41
+      */
+     int8_t dst_data[4] = {9, 21, 17, 41};
      int dims[2] = {2, 3};
+     int dst_dims[2] = {2, 2};
 
      src1 = tl_tensor_create(src1_data, 2, dims, TL_INT8);
      src2 = tl_tensor_create(src2_data, 2, dims, TL_INT8);
-     dst = tl_tensor_dot_product(src1, src2, NULL);
-     ck_assert_int_eq(dst->ndim, 1);
+     dst = tl_tensor_inner(src1, src2, NULL);
+     ck_assert_int_eq(dst->ndim, 2);
      ck_assert_int_eq(dst->dtype, TL_INT8);
-     ck_assert_int_eq(dst->len, 1);
-     ck_assert(dst->dims[0] == 1);
+     ck_assert_int_eq(dst->len, 4);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 2);
      ck_assert_array_int_eq((int8_t*)dst->data, dst_data, dst->len);
      tl_tensor_free_data_too(dst);
 
      src1 = tl_tensor_create(src1_data, 2, dims, TL_INT8);
      src2 = tl_tensor_create(src2_data, 2, dims, TL_INT8);
-     dst = tl_tensor_zeros(1, ARR(int,1), TL_INT8);
-     dst = tl_tensor_dot_product(src1, src2, dst);
-     ck_assert_int_eq(dst->ndim, 1);
+     dst = tl_tensor_zeros(2, dst_dims, TL_INT8);
+     dst = tl_tensor_inner(src1, src2, dst);
+     ck_assert_int_eq(dst->ndim, 2);
      ck_assert_int_eq(dst->dtype, TL_INT8);
-     ck_assert_int_eq(dst->len, 1);
-     ck_assert(dst->dims[0] == 1);
+     ck_assert_int_eq(dst->len, 4);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 2);
      ck_assert_array_int_eq((int8_t *)dst->data, dst_data, dst->len);
      tl_tensor_free_data_too(dst);
 
@@ -1155,7 +1168,7 @@ LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
     LN_TEST_ADD_TEST(test_tl_tensor_maxreduce);
     LN_TEST_ADD_TEST(test_tl_tensor_elew);
     LN_TEST_ADD_TEST(test_tl_tensor_elew_param);
-    LN_TEST_ADD_TEST(test_tl_tensor_dot_product);
+    LN_TEST_ADD_TEST(test_tl_tensor_inner);
     LN_TEST_ADD_TEST(test_tl_tensor_transpose);
     LN_TEST_ADD_TEST(test_tl_tensor_lrelu);
     LN_TEST_ADD_TEST(test_tl_tensor_convert);
