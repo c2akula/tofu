@@ -49,25 +49,19 @@ The "hanging" was entirely due to memory corruption from invalid stack pointers.
 
 ---
 
-## Issue 2: Memory Leak in Operation Node Values
+## Issue 2: Memory Leak in Operation Node Values (RESOLVED)
 
-### Current State
-Operation nodes create tensor values for their outputs, but these are never freed. The comment in `tl_graph_node_free()` says:
-```c
-/* Note: We don't free node->value here because:
- * - For INPUT/PARAM nodes, value is owned by user
- * - For operation nodes, value will be freed by operations
- */
-```
+### Status: ✅ FIXED in commit 9523ef9
 
-However, **operation node values are NOT being freed anywhere**, creating a memory leak.
+### The Problem
+Operation nodes create tensor values for their outputs, but these were never freed. The comment in `tl_graph_node_free()` incorrectly stated that operation node values would be freed by operations.
 
-### Impact
+### Impact Before Fix
 - Each operation allocates a result tensor
 - Training loop with 100 iterations × 4 operations = 400 leaked tensors
 - Not critical for short tests, but problematic for long training
 
-### Recommended Fix
+### The Fix Applied
 ```c
 static void tl_graph_node_free(tl_graph_node* node)
 {
@@ -92,10 +86,12 @@ static void tl_graph_node_free(tl_graph_node* node)
 
 ---
 
-## Issue 3: Graph Accumulation in Training Loops
+## Issue 3: Graph Accumulation in Training Loops (RESOLVED)
 
-### Current Behavior
-Each training iteration creates new nodes that are never removed:
+### Status: ✅ FIXED in commit 9523ef9
+
+### The Problem
+Each training iteration created new nodes that were never removed:
 ```
 Iteration 0: 3 nodes
 Iteration 1: 5 nodes
@@ -103,16 +99,13 @@ Iteration 2: 7 nodes
 Iteration 100: 203 nodes
 ```
 
-### Impact
-- Backward pass must traverse all accumulated nodes
-- Slower as training progresses
+### Impact Before Fix
+- Backward pass had to traverse all accumulated nodes
+- Performance degraded as training progressed
 - Higher memory usage
 
-### Workaround (Current)
-Limit training iterations in tests to prevent excessive accumulation.
-
-### Recommended Solution
-Implement a graph reset mechanism:
+### The Fix Applied
+Implemented `tl_graph_clear_ops()` function:
 ```c
 void tl_graph_clear_ops(tl_graph* g) {
     /* Keep INPUT and PARAM nodes, remove all operation nodes */
@@ -129,7 +122,27 @@ void tl_graph_clear_ops(tl_graph* g) {
 }
 ```
 
-Call this after each training iteration to maintain constant graph size.
+### Usage in Training Loops
+```c
+/* Create graph and INPUT/PARAM nodes once */
+tl_graph* g = tl_graph_create();
+tl_graph_node* x = tl_graph_input(g, x_tensor);
+tl_graph_node* w = tl_graph_param(g, w_tensor);
+
+for (int iter = 0; iter < num_iterations; iter++) {
+    /* Forward pass creates new operation nodes */
+    tl_graph_node* y = tl_graph_matmul(g, x, w);
+
+    /* Backward pass */
+    tl_graph_backward(g, y);
+
+    /* Clear operation nodes, keeping INPUT/PARAM nodes */
+    tl_graph_clear_ops(g);  // Graph returns to original size
+}
+```
+
+### Result
+Graph size remains constant across all training iterations, preventing memory bloat and performance degradation.
 
 ---
 
@@ -173,6 +186,42 @@ Input → Patch Embedding + Position Embedding
 3. Add MLP blocks (two linear layers with GELU)
 4. Add residual connections
 5. Stack multiple transformer layers
+
+---
+
+## Issue 5: Build System - Multiple main() Functions (RESOLVED)
+
+### Status: ✅ FIXED in commit 9523ef9
+
+### The Problem
+The Makefile was attempting to link all test files into a single binary, but multiple test files had their own `main()` functions:
+- `test_tofu.c` - The main test runner
+- `test_new_ops.c` - Standalone test with main()
+- `test_tl_graph.c` - Standalone test with main()
+
+This caused linker errors:
+```
+duplicate symbol '_main' in:
+    test_new_ops.o
+    test_tofu.o
+    test_tl_graph.o
+```
+
+### The Fix Applied
+1. **Moved standalone tests**: Relocated `test_new_ops.c` and `test_tl_graph.c` to `test/standalone/` directory
+2. **Updated file names**: Renamed to `standalone_test_*.c` to clarify their purpose
+3. **Fixed missing Makefile variables**: Added `LIBTARGET_A` and `LIBTARGET_SO` definitions
+
+**Note**: The `config.mk` file is `.gitignore`d. If you're setting up a fresh clone, add these lines to `config.mk`:
+```makefile
+LIBTARGET_A ?= lib$(TARGET).a
+LIBTARGET_SO ?= lib$(TARGET).so
+```
+
+### Result
+- Main test suite builds successfully without linker errors
+- All 66 tests pass
+- Standalone tests preserved in separate directory for individual compilation
 
 ---
 
