@@ -16,3 +16,8 @@ obj/
 build/
 compile_commands.json
 .clangd
+examples/neural_net_inference
+examples/deep_network
+examples/test_activations
+examples/stress_test
+examples/deep_network_diagnostic
