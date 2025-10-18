@@ -587,9 +587,31 @@ LN_TEST_END
 LN_TEST_START(test_tl_tensor_inner)
 {
      tl_tensor *src1, *src2, *dst;
-     int8_t src1_data[6] = {1, 1, 2, 2, 3, 3};
-     int8_t src2_data[6] = {1, 2, 3, 4, 5, 6};
-     /* NumPy-compatible inner product for [2,3] x [2,3]:
+
+     /* Test case 1: 1-D vectors -> scalar (special case)
+      * [3] x [3] -> scalar
+      * [1, 2, 3] · [4, 5, 6] = 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
+      */
+     int32_t vec1_data[3] = {1, 2, 3};
+     int32_t vec2_data[3] = {4, 5, 6};
+     int32_t scalar_result[1] = {32};
+
+     src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+     src2 = tl_tensor_create(vec2_data, 1, ARR(int, 3), TL_INT32);
+     dst = tl_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 1);
+     ck_assert_int_eq(dst->dims[0], 1);
+     ck_assert_int_eq(dst->len, 1);
+     ck_assert_int_eq(dst->dtype, TL_INT32);
+     ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+     tl_tensor_free(src1);
+     tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
+
+     /* Test case 2: 2-D same shape [2,3] x [2,3] -> [2,2]
+      * NumPy-compatible inner product for [2,3] x [2,3]:
       * Output shape: [2,2] (cartesian product over non-last dimensions)
       * result[i,j] = inner_product(src1[i,:], src2[j,:])
       * result[0,0] = 1*1 + 1*2 + 2*3 = 9
@@ -597,35 +619,147 @@ LN_TEST_START(test_tl_tensor_inner)
       * result[1,0] = 2*1 + 3*2 + 3*3 = 17
       * result[1,1] = 2*4 + 3*5 + 3*6 = 41
       */
-     int8_t dst_data[4] = {9, 21, 17, 41};
-     int dims[2] = {2, 3};
-     int dst_dims[2] = {2, 2};
+     int8_t src1_data[6] = {1, 1, 2, 2, 3, 3};
+     int8_t src2_data[6] = {1, 2, 3, 4, 5, 6};
+     int8_t result_2x2[4] = {9, 21, 17, 41};
 
-     src1 = tl_tensor_create(src1_data, 2, dims, TL_INT8);
-     src2 = tl_tensor_create(src2_data, 2, dims, TL_INT8);
+     src1 = tl_tensor_create(src1_data, 2, ARR(int, 2, 3), TL_INT8);
+     src2 = tl_tensor_create(src2_data, 2, ARR(int, 2, 3), TL_INT8);
      dst = tl_tensor_inner(src1, src2, NULL);
-     ck_assert_int_eq(dst->ndim, 2);
-     ck_assert_int_eq(dst->dtype, TL_INT8);
-     ck_assert_int_eq(dst->len, 4);
-     ck_assert(dst->dims[0] == 2);
-     ck_assert(dst->dims[1] == 2);
-     ck_assert_array_int_eq((int8_t*)dst->data, dst_data, dst->len);
-     tl_tensor_free_data_too(dst);
 
-     src1 = tl_tensor_create(src1_data, 2, dims, TL_INT8);
-     src2 = tl_tensor_create(src2_data, 2, dims, TL_INT8);
-     dst = tl_tensor_zeros(2, dst_dims, TL_INT8);
-     dst = tl_tensor_inner(src1, src2, dst);
      ck_assert_int_eq(dst->ndim, 2);
-     ck_assert_int_eq(dst->dtype, TL_INT8);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 2);
      ck_assert_int_eq(dst->len, 4);
-     ck_assert(dst->dims[0] == 2);
-     ck_assert(dst->dims[1] == 2);
-     ck_assert_array_int_eq((int8_t *)dst->data, dst_data, dst->len);
-     tl_tensor_free_data_too(dst);
+     ck_assert_int_eq(dst->dtype, TL_INT8);
+     ck_assert_array_int_eq((int8_t*)dst->data, result_2x2, dst->len);
 
      tl_tensor_free(src1);
      tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
+
+     /* Test case 3: 2-D different shapes [2,4] x [3,4] -> [2,3]
+      * src1 = [[1,2,3,4], [5,6,7,8]]  shape [2,4]
+      * src2 = [[1,1,1,1], [2,2,2,2], [3,3,3,3]]  shape [3,4]
+      * result[0,0] = 1*1 + 2*1 + 3*1 + 4*1 = 10
+      * result[0,1] = 1*2 + 2*2 + 3*2 + 4*2 = 20
+      * result[0,2] = 1*3 + 2*3 + 3*3 + 4*3 = 30
+      * result[1,0] = 5*1 + 6*1 + 7*1 + 8*1 = 26
+      * result[1,1] = 5*2 + 6*2 + 7*2 + 8*2 = 52
+      * result[1,2] = 5*3 + 6*3 + 7*3 + 8*3 = 78
+      */
+     int16_t arr1_data[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+     int16_t arr2_data[12] = {1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
+     int16_t result_2x3[6] = {10, 20, 30, 26, 52, 78};
+
+     src1 = tl_tensor_create(arr1_data, 2, ARR(int, 2, 4), TL_INT16);
+     src2 = tl_tensor_create(arr2_data, 2, ARR(int, 3, 4), TL_INT16);
+     dst = tl_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 3);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert_int_eq(dst->dtype, TL_INT16);
+     ck_assert_array_int_eq((int16_t*)dst->data, result_2x3, dst->len);
+
+     tl_tensor_free(src1);
+     tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
+
+     /* Test case 4: 3-D arrays [2,2,3] x [2,2,3] -> [2,2,2,2]
+      * Testing the full N-D case with cartesian product
+      * src1 has shape [2,2,3], src2 has shape [2,2,3]
+      * Output should have shape [2,2] + [2,2] = [2,2,2,2]
+      */
+     float tensor3d_1[12] = {1, 1, 1,  2, 2, 2,  3, 3, 3,  4, 4, 4};
+     float tensor3d_2[12] = {1, 2, 3,  1, 2, 3,  1, 2, 3,  1, 2, 3};
+     // For simplicity, just verify shape and a few sample values
+
+     src1 = tl_tensor_create(tensor3d_1, 3, ARR(int, 2, 2, 3), TL_FLOAT);
+     src2 = tl_tensor_create(tensor3d_2, 3, ARR(int, 2, 2, 3), TL_FLOAT);
+     dst = tl_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 4);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 2);
+     ck_assert_int_eq(dst->dims[2], 2);
+     ck_assert_int_eq(dst->dims[3], 2);
+     ck_assert_int_eq(dst->len, 16);
+     ck_assert_int_eq(dst->dtype, TL_FLOAT);
+
+     // Verify a few specific values
+     // result[0,0,0,0] = (1,1,1)·(1,2,3) = 1*1 + 1*2 + 1*3 = 6
+     ck_assert(((float*)dst->data)[0] == 6.0f);
+     // result[0,0,1,0] = (1,1,1)·(1,2,3) = 6 (same vector)
+     ck_assert(((float*)dst->data)[2] == 6.0f);
+
+     tl_tensor_free(src1);
+     tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
+
+     /* Test case 5: Mixed dimensions [2,3,4] x [5,4] -> [2,3,5]
+      * 3-D tensor with 2-D tensor
+      * src1.shape[:-1] = [2,3], src2.shape[:-1] = [5]
+      * Output shape = [2,3] + [5] = [2,3,5]
+      */
+     float mixed_3d[24];  // 2*3*4 = 24
+     float mixed_2d[20];  // 5*4 = 20
+     for (int i = 0; i < 24; i++) mixed_3d[i] = (float)(i + 1);
+     for (int i = 0; i < 20; i++) mixed_2d[i] = 1.0f;
+
+     src1 = tl_tensor_create(mixed_3d, 3, ARR(int, 2, 3, 4), TL_FLOAT);
+     src2 = tl_tensor_create(mixed_2d, 2, ARR(int, 5, 4), TL_FLOAT);
+     dst = tl_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 3);
+     ck_assert_int_eq(dst->dims[2], 5);
+     ck_assert_int_eq(dst->len, 30);
+     ck_assert_int_eq(dst->dtype, TL_FLOAT);
+
+     // Verify first value: (1,2,3,4)·(1,1,1,1) = 10
+     ck_assert(((float*)dst->data)[0] == 10.0f);
+
+     tl_tensor_free(src1);
+     tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
+
+     /* Test case 6: Edge case - single element last dimension [2,1] x [3,1] -> [2,3]
+      * Each "vector" has length 1
+      */
+     int32_t single_1[2] = {5, 10};
+     int32_t single_2[3] = {2, 3, 4};
+     int32_t result_single[6] = {10, 15, 20, 20, 30, 40};  // outer product essentially
+
+     src1 = tl_tensor_create(single_1, 2, ARR(int, 2, 1), TL_INT32);
+     src2 = tl_tensor_create(single_2, 2, ARR(int, 3, 1), TL_INT32);
+     dst = tl_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 3);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert_array_int_eq((int32_t*)dst->data, result_single, dst->len);
+
+     tl_tensor_free(src1);
+     tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
+
+     /* Test case 7: Pre-allocated destination tensor */
+     src1 = tl_tensor_create(vec1_data, 1, ARR(int, 3), TL_INT32);
+     src2 = tl_tensor_create(vec2_data, 1, ARR(int, 3), TL_INT32);
+     dst = tl_tensor_zeros(1, ARR(int, 1), TL_INT32);
+     dst = tl_tensor_inner(src1, src2, dst);
+
+     ck_assert_int_eq(dst->ndim, 1);
+     ck_assert_int_eq(dst->dims[0], 1);
+     ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+     tl_tensor_free(src1);
+     tl_tensor_free(src2);
+     tl_tensor_free_data_too(dst);
 }
 LN_TEST_END
 
