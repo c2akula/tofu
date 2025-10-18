@@ -13,6 +13,8 @@ void test_backward_add();
 void test_backward_relu();
 void test_backward_composite();
 void test_gradient_accumulation();
+void test_backward_softmax();
+void test_backward_layer_norm();
 
 /* Sprint 1 Tests: Core Infrastructure */
 
@@ -359,7 +361,7 @@ void test_graph_composite()
 int main()
 {
     printf("============================================================\n");
-    printf("Sprints 1, 2 & 3: Computation Graph Tests\n");
+    printf("Sprints 1-4: Computation Graph Tests\n");
     printf("============================================================\n\n");
 
     printf("Sprint 1: Core Infrastructure\n");
@@ -387,8 +389,13 @@ int main()
     test_backward_composite();
     test_gradient_accumulation();
 
+    printf("\nSprint 4: Advanced Backward Pass\n");
+    printf("----------------------------------\n");
+    test_backward_softmax();
+    test_backward_layer_norm();
+
     printf("\n============================================================\n");
-    printf("All tests passed! ✓ (Sprints 1, 2 & 3 complete)\n");
+    printf("All tests passed! ✓ (Sprints 1, 2, 3 & 4 complete)\n");
     printf("============================================================\n");
 
     return 0;
@@ -574,6 +581,86 @@ void test_gradient_accumulation()
     }
 
     tl_tensor_free(t);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+/* Sprint 4 Tests: Advanced Backward Pass */
+
+void test_backward_softmax()
+{
+    printf("Test: Backward pass (softmax)...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    /* x: [3], apply softmax along axis 0 */
+    float data_x[] = {1.0f, 2.0f, 3.0f};
+    tl_tensor* t_x = tl_tensor_create(data_x, 1, (int[]){3}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_param(g, t_x);
+    tl_graph_node* y = tl_graph_softmax(g, x, 0);
+
+    tl_graph_backward(g, y);
+
+    /* Check that gradients exist and have correct shape */
+    assert(x->grad != NULL);
+    assert(x->grad->ndim == 1);
+    assert(x->grad->dims[0] == 3);
+
+    /* Softmax gradient should sum to 0 along the axis */
+    float grad_sum = 0.0f;
+    for (int i = 0; i < 3; i++) {
+        float grad;
+        TL_TENSOR_DATA_TO(x->grad, i, grad, TL_FLOAT);
+        grad_sum += grad;
+    }
+    assert(fabsf(grad_sum) < 1e-5);
+
+    tl_tensor_free(t_x);
+    tl_graph_free(g);
+    printf("  ✓ PASSED\n");
+}
+
+void test_backward_layer_norm()
+{
+    printf("Test: Backward pass (layer norm)...\n");
+
+    tl_graph* g = tl_graph_create();
+
+    /* x: [2, 3], gamma: [3], beta: [3] */
+    float data_x[] = {1.0f, 2.0f, 3.0f,
+                      4.0f, 5.0f, 6.0f};
+    float data_gamma[] = {1.0f, 1.0f, 1.0f};
+    float data_beta[] = {0.0f, 0.0f, 0.0f};
+
+    tl_tensor* t_x = tl_tensor_create(data_x, 2, (int[]){2, 3}, TL_FLOAT);
+    tl_tensor* t_gamma = tl_tensor_create(data_gamma, 1, (int[]){3}, TL_FLOAT);
+    tl_tensor* t_beta = tl_tensor_create(data_beta, 1, (int[]){3}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_param(g, t_x);
+    tl_graph_node* gamma = tl_graph_param(g, t_gamma);
+    tl_graph_node* beta = tl_graph_param(g, t_beta);
+    tl_graph_node* y = tl_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
+
+    tl_graph_backward(g, y);
+
+    /* Check that all gradients exist with correct shapes */
+    assert(x->grad != NULL);
+    assert(x->grad->ndim == 2);
+    assert(x->grad->dims[0] == 2);
+    assert(x->grad->dims[1] == 3);
+
+    assert(gamma->grad != NULL);
+    assert(gamma->grad->ndim == 1);
+    assert(gamma->grad->dims[0] == 3);
+
+    assert(beta->grad != NULL);
+    assert(beta->grad->ndim == 1);
+    assert(beta->grad->dims[0] == 3);
+
+    tl_tensor_free(t_x);
+    tl_tensor_free(t_gamma);
+    tl_tensor_free(t_beta);
     tl_graph_free(g);
     printf("  ✓ PASSED\n");
 }
