@@ -84,7 +84,7 @@ tl_tensor *tl_tensor_elew(const tl_tensor *src1, const tl_tensor *src2, tl_tenso
                           tl_elew_op elew_op);
 tl_tensor *tl_tensor_elew_param(const tl_tensor *src, double param, tl_tensor *dst,
                                 tl_elew_op elew_op);
-tl_tensor *tl_tensor_dot_product(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+tl_tensor *tl_tensor_inner(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
 tl_tensor *tl_tensor_transpose(const tl_tensor *src, tl_tensor *dst, const int *axes);
 tl_tensor *tl_tensor_lrelu(const tl_tensor *src, tl_tensor *dst, float negslope);
 tl_tensor *tl_tensor_convert(const tl_tensor *src, tl_tensor *dst, tl_dtype dtype_d);

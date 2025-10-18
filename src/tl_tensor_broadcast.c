@@ -56,8 +56,9 @@ TL_EXPORT int tl_tensor_isbroadcastable(const tl_tensor *t1, const tl_tensor *t2
 
 /**
  * Calculate output dimensions after broadcasting two tensors
+ * NOTE: This function is exposed via tl_tensor_broadcast_internal.h for testing
  */
-static void tl_compute_broadcast_dims(const tl_tensor *t1, const tl_tensor *t2, int *out_ndim, int *out_dims)
+void tl_compute_broadcast_dims(const tl_tensor *t1, const tl_tensor *t2, int *out_ndim, int *out_dims)
 {
     int i, pos1, pos2;
     int max_ndim = (t1->ndim > t2->ndim) ? t1->ndim : t2->ndim;
@@ -79,8 +80,9 @@ static void tl_compute_broadcast_dims(const tl_tensor *t1, const tl_tensor *t2, 
 
 /**
  * Computes broadcasting strides for a tensor
+ * NOTE: This function is exposed via tl_tensor_broadcast_internal.h for testing
  */
-static void tl_compute_broadcast_strides(const tl_tensor *t, int out_ndim, const int *out_dims, int *strides)
+void tl_compute_broadcast_strides(const tl_tensor *t, int out_ndim, const int *out_dims, int *strides)
 {
     int i, pos;
     
