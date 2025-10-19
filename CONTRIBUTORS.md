@@ -7,7 +7,7 @@ This project is a derivative work based on TensorLight, with substantial modific
 **Zhao Zhixu** (2018-2020)
 - Created TensorLight, the original tensor computation library
 - Core tensor operations and graph infrastructure
-- Original build system and ESP32 support
+- Original build system
 
 ## Tofu Development (2025)
 
@@ -35,6 +35,11 @@ Major contributions and enhancements:
 - **Examples**:
   - CNN training example (8x8 pattern recognition, 100% accuracy)
   - ResNet training example (residual blocks with skip connections, 100% accuracy)
+
+- **Build System & Tooling**:
+  - ESP32 cross-compilation support (configure script with --esp32 option)
+  - Enhanced build system with platform detection
+  - pkg-config integration
 
 - **Documentation**:
   - CHANGELOG.md with Keep a Changelog format
