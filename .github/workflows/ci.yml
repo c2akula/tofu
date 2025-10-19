@@ -22,13 +22,13 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
+        sudo apt-get install -y build-essential check
 
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
       run: |
-        # macOS has build tools pre-installed
-        echo "Using pre-installed build tools"
+        # Install check package for configure script
+        brew install check || echo "Check package installation skipped"
 
     - name: Configure build
       run: |
