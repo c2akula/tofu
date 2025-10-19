@@ -158,10 +158,17 @@ TOFU_EXPORT tofu_tensor *tofu_tensor_arange(double start, double stop, double st
     assert(stop >= min_d && stop <= max_d);
     assert(step >= min_d && step <= max_d);
     assert(step != 0);
-    assert(stop > start); /* TODO: expand to all possibilities */
 #endif
 
-    len = ceil((stop - start) / step);
+    /* Calculate length supporting all cases: positive/negative step, empty arrays */
+    double diff = stop - start;
+    if ((step > 0 && diff <= 0) || (step < 0 && diff >= 0)) {
+        /* Empty array: incompatible step direction or start == stop */
+        return NULL;
+    } else {
+        len = ceil(diff / step);
+    }
+
     if (len > INT32_MAX)
         return NULL;
 
@@ -188,10 +195,16 @@ TOFU_EXPORT void tofu_tensor_rearange(tofu_tensor *src, double start, double sto
     assert(stop >= min_d && stop <= max_d);
     assert(step >= min_d && step <= max_d);
     assert(step != 0);
-    assert(stop > start); /* TODO: expand to all possibilities */
 #endif
 
-    len = ceil((stop - start) / step);
+    /* Calculate length supporting all cases: positive/negative step, empty arrays */
+    double diff = stop - start;
+    if ((step > 0 && diff <= 0) || (step < 0 && diff >= 0)) {
+        len = 0;  /* Empty array: incompatible step direction or start == stop */
+    } else {
+        len = ceil(diff / step);
+    }
+
     dsize = tofu_size_of(src->dtype);
 
     assert(len <= INT32_MAX);
