@@ -851,6 +851,62 @@ static void accumulate_grad(tofu_graph_node* node, tofu_tensor* grad_contrib)
     }
 }
 
+/* Helper: Reduce gradient to match input shape when broadcasting occurred
+ * When broadcasting happens in forward pass (e.g., [3,1] * [3,4] -> [3,4]),
+ * the gradient has the output shape [3,4], but we need to reduce it back to [3,1]
+ * by summing over the broadcast dimensions.
+ */
+static tofu_tensor* reduce_grad_for_broadcast(tofu_tensor* grad, const tofu_tensor* input)
+{
+    int i;
+    tofu_tensor* reduced_grad = grad;
+
+    /* Identify dimensions that need reduction by comparing shapes from the right */
+    int grad_ndim = grad->ndim;
+    int input_ndim = input->ndim;
+
+    /* Process dimensions from right to left (align from trailing dimensions) */
+    for (i = 0; i < grad_ndim; i++) {
+        int grad_axis = grad_ndim - 1 - i;  /* Current axis in grad */
+        int input_axis = input_ndim - 1 - i;  /* Corresponding axis in input */
+
+        /* Determine if this dimension needs reduction */
+        int needs_reduction = 0;
+
+        if (input_axis < 0) {
+            /* Grad has more dimensions - this is a prepended dimension, needs reduction */
+            needs_reduction = 1;
+        } else if (input->dims[input_axis] == 1 && reduced_grad->dims[grad_axis] > 1) {
+            /* Input had size 1 but grad has size > 1 - broadcast dimension, needs reduction */
+            needs_reduction = 1;
+        }
+
+        if (needs_reduction) {
+            tofu_tensor* temp = tofu_tensor_sumreduce(reduced_grad, NULL, grad_axis);
+            if (reduced_grad != grad) {
+                tofu_tensor_free_data_too(reduced_grad);
+            }
+            reduced_grad = temp;
+            /* Note: sumreduce doesn't change ndim, just sets dims[grad_axis] = 1 */
+        }
+    }
+
+    /* If reduced_grad has more dimensions than input, reshape to match
+     * (sumreduce keeps dims as size 1, but we need to match input's ndim) */
+    if (reduced_grad->ndim != input_ndim) {
+        /* Reshape returns a view, so we need to clone to avoid dangling references */
+        tofu_tensor* temp_reshape = tofu_tensor_reshape(reduced_grad, input_ndim, input->dims);
+        tofu_tensor* cloned = tofu_tensor_clone(temp_reshape);
+        tofu_tensor_free(temp_reshape);  /* Free the view */
+        if (reduced_grad != grad) {
+            tofu_tensor_free_data_too(reduced_grad);  /* Free the intermediate */
+        }
+        reduced_grad = cloned;
+    }
+
+    return reduced_grad;
+}
+
 /* Backward functions for each operation */
 
 /* Matmul backward: y = A @ B */
@@ -962,13 +1018,20 @@ static void add_backward(tofu_graph_node* node)
 
     /* ∂L/∂x = ∂L/∂z (sum over broadcast dimensions if needed) */
     if (x->requires_grad) {
-        /* TODO: Handle broadcasting properly - for now assume same shape */
-        accumulate_grad(x, grad_z);
+        tofu_tensor* grad_x = reduce_grad_for_broadcast(grad_z, x->value);
+        accumulate_grad(x, grad_x);
+        if (grad_x != grad_z) {
+            tofu_tensor_free_data_too(grad_x);
+        }
     }
 
-    /* ∂L/∂y = ∂L/∂z */
+    /* ∂L/∂y = ∂L/∂z (sum over broadcast dimensions if needed) */
     if (y->requires_grad) {
-        accumulate_grad(y, grad_z);
+        tofu_tensor* grad_y = reduce_grad_for_broadcast(grad_z, y->value);
+        accumulate_grad(y, grad_y);
+        if (grad_y != grad_z) {
+            tofu_tensor_free_data_too(grad_y);
+        }
     }
 }
 
@@ -985,18 +1048,26 @@ static void mul_backward(tofu_graph_node* node)
     if (!grad_z)
         return;
 
-    /* ∂L/∂x = ∂L/∂z * y */
+    /* ∂L/∂x = ∂L/∂z * y (sum over broadcast dimensions if needed) */
     if (x->requires_grad) {
-        tofu_tensor* grad_x = tofu_tensor_elew_broadcast(grad_z, y->value, NULL, TOFU_MUL);
+        tofu_tensor* grad_x_full = tofu_tensor_elew_broadcast(grad_z, y->value, NULL, TOFU_MUL);
+        tofu_tensor* grad_x = reduce_grad_for_broadcast(grad_x_full, x->value);
         accumulate_grad(x, grad_x);
-        tofu_tensor_free_data_too(grad_x);
+        tofu_tensor_free_data_too(grad_x_full);
+        if (grad_x != grad_x_full) {
+            tofu_tensor_free_data_too(grad_x);
+        }
     }
 
-    /* ∂L/∂y = ∂L/∂z * x */
+    /* ∂L/∂y = ∂L/∂z * x (sum over broadcast dimensions if needed) */
     if (y->requires_grad) {
-        tofu_tensor* grad_y = tofu_tensor_elew_broadcast(grad_z, x->value, NULL, TOFU_MUL);
+        tofu_tensor* grad_y_full = tofu_tensor_elew_broadcast(grad_z, x->value, NULL, TOFU_MUL);
+        tofu_tensor* grad_y = reduce_grad_for_broadcast(grad_y_full, y->value);
         accumulate_grad(y, grad_y);
-        tofu_tensor_free_data_too(grad_y);
+        tofu_tensor_free_data_too(grad_y_full);
+        if (grad_y != grad_y_full) {
+            tofu_tensor_free_data_too(grad_y);
+        }
     }
 }
 
