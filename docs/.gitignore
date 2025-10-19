@@ -1,0 +1,6 @@
+# mdBook build output
+book/
+
+# Backup files
+*.bak
+*~
