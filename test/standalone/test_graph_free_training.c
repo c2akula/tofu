@@ -1,57 +1,60 @@
-/*
- * Test to verify operation node value memory leak is fixed
- */
-
 #include <stdio.h>
 #include <stdlib.h>
-#include "tl_graph.h"
-#include "tl_tensor.h"
+#include <time.h>
+#include "src/tl_graph.h"
+#include "src/tl_tensor.h"
+#include "src/tl_optimizer.h"
 
-int main(void)
-{
+void test_training_graph_free() {
     printf("Testing graph_free after training iterations...\n\n");
-
-    /* Create input and parameters */
-    float x_data[] = {1.0f, 2.0f};
-    float w_data[] = {0.5f, 0.3f};
-    float b_data[] = {0.1f};
-
-    tl_tensor* x_tensor = tl_tensor_create(x_data, 1, (int[]){2}, TL_FLOAT);
-    tl_tensor* w_tensor = tl_tensor_create(w_data, 1, (int[]){2}, TL_FLOAT);
-    tl_tensor* b_tensor = tl_tensor_create(b_data, 1, (int[]){1}, TL_FLOAT);
-
+    
+    tl_graph* g = tl_graph_create();
+    
+    /* Create simple network */
+    float W_data[4] = {0.1f, 0.2f, 0.3f, 0.4f};
+    tl_tensor* t_W = tl_tensor_create(W_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tl_graph_node* W = tl_graph_param(g, t_W);
+    
+    tl_optimizer* opt = tl_optimizer_sgd_create(g, 0.1);
+    
+    /* Run a few training iterations */
     printf("Running 5 training iterations...\n");
     for (int iter = 0; iter < 5; iter++) {
-        /* Create graph */
-        tl_graph* g = tl_graph_create();
-
-        /* Create nodes */
-        tl_graph_node* x = tl_graph_input(g, x_tensor);
-        tl_graph_node* w = tl_graph_param(g, w_tensor);
-        tl_graph_node* b = tl_graph_param(g, b_tensor);
-
-        /* Forward pass: y = sum(x * w) + b */
-        tl_graph_node* xw = tl_graph_mul(g, x, w);
-        tl_graph_node* sum_xw = xw;  /* Simplified - in real code would sum */
-        tl_graph_node* y = tl_graph_add(g, sum_xw, b);
-
+        tl_optimizer_zero_grad(opt);
+        
+        float x_data[2] = {1.0f, 2.0f};
+        tl_tensor* t_x = tl_tensor_create(x_data, 1, (int[]){2}, TL_FLOAT);
+        tl_graph_node* x = tl_graph_input(g, t_x);
+        
+        /* Forward */
+        tl_graph_node* out = tl_graph_matmul(g, x, W);
+        
+        /* Backward */
+        out->grad = tl_tensor_create((float[]){1.0f, 1.0f}, 1, (int[]){2}, TL_FLOAT);
+        tl_graph_backward(g, out);
+        
+        /* Update */
+        tl_optimizer_step(opt);
+        
+        tl_tensor_free(t_x);
+        
         printf("  Iteration %d: graph has %d nodes\n", iter, g->num_nodes);
-
-        /* Backward pass */
-        float grad_data[] = {1.0f};
-        y->grad = tl_tensor_create_with_values(grad_data, 1, (int[]){1});
-        tl_graph_backward(g, y);
-
-        /* Free graph - this should now properly free operation node values */
-        tl_graph_free(g);
     }
+    
+    printf("\nAttempting to free graph with %d nodes...\n", g->num_nodes);
+    clock_t start = clock();
+    
+    tl_tensor_free(t_W);
+    tl_optimizer_free(opt);
+    tl_graph_free(g);
+    
+    clock_t end = clock();
+    double time_ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0;
+    printf("Cleanup took %.2f ms\n", time_ms);
+    printf("✓ Success!\n");
+}
 
-    printf("\nGraph cleanup successful! Memory leak should be fixed.\n");
-
-    /* Cleanup */
-    tl_tensor_free_data_too(x_tensor);
-    tl_tensor_free_data_too(w_tensor);
-    tl_tensor_free_data_too(b_tensor);
-
+int main() {
+    test_training_graph_free();
     return 0;
 }

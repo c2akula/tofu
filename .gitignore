@@ -21,3 +21,15 @@ examples/deep_network
 examples/test_activations
 examples/stress_test
 examples/deep_network_diagnostic
+
+# Test executables and outputs
+test_*
+!test_*.c
+!test_*/
+*_output.txt
+*.txt.bak
+
+# Standalone test binaries
+test/standalone/test_validation_phase*
+test/standalone/test_gradient_*
+!test/standalone/*.c
