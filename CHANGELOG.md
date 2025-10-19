@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - API stabilization for v1.0.0
 
+### Added - Milestone 4: API Stabilization (Phase 2)
+- **Comprehensive API Documentation**: Added Doxygen comments to all public functions
+  - `tofu_tensor.h`: 40+ functions with detailed preconditions, ownership semantics, and cross-references
+  - `tofu_graph.h`: 20+ graph operations with gradient computation details
+  - `tofu_optimizer.h`: 7 optimizer functions with algorithm descriptions
+  - Each function documents NULL handling, memory ownership, and crash behavior
+- **API Stability Guarantee**: Created `API_STABILITY.md` defining:
+  - Semantic versioning policy (MAJOR.MINOR.PATCH)
+  - Public API definition and stability guarantees
+  - Deprecation policy (one major version warning period)
+  - Breaking change request process
+
 ### Changed - BREAKING
 - **API Rename**: Changed all API prefixes from `tl_`/`TL_` to `tofu_`/`TOFU_` (Milestone 4: API Stabilization)
   - All functions: `tl_tensor_create` → `tofu_tensor_create`, `tl_graph_create` → `tofu_graph_create`, etc.
