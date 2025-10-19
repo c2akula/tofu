@@ -25,16 +25,16 @@
 
 /* start of config */
 
-#include "tl_tensor.h"
+#include "tofu_tensor.h"
 
 #ifdef __cplusplus
-TL_CPPSTART
+TOFU_CPPSTART
 #endif
 
-void tl_sprint_version(char *version_str);
+void tofu_sprint_version(char *version_str);
 
 #ifdef __cplusplus
-TL_CPPEND
+TOFU_CPPEND
 #endif
 
 #endif /* _TOFU_H_ */

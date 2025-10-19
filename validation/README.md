@@ -6,8 +6,8 @@ This directory contains Python scripts for validating the C implementation again
 
 These scripts establish ground truth and validate the implementation:
 
-- **`validate_inner_comprehensive.py`** - Validates `tl_tensor_inner()` against `np.inner()`
-- **`validate_matmul.py`** - Validates `tl_tensor_matmul()` against `np.matmul()`
+- **`validate_inner_comprehensive.py`** - Validates `tofu_tensor_inner()` against `np.inner()`
+- **`validate_matmul.py`** - Validates `tofu_tensor_matmul()` against `np.matmul()`
 - **`test_broadcast_ground_truth.py`** - Validates broadcasting mechanism internals
 
 ## Documentation Scripts

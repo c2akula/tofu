@@ -22,19 +22,19 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
-#include "tl_tensor.h"
-#include "tl_graph.h"
-#include "tl_optimizer.h"
+#include "tofu_tensor.h"
+#include "tofu_graph.h"
+#include "tofu_optimizer.h"
 
 /* Random float between -1 and 1 */
-static float tl_random_uniform() {
+static float tofu_random_uniform() {
     return 2.0f * (float)rand() / RAND_MAX - 1.0f;
 }
 
 /* Xavier weight initialization */
-static float tl_xavier_init(int fan_in) {
+static float tofu_xavier_init(int fan_in) {
     float limit = sqrtf(6.0f / (float)fan_in);
-    return tl_random_uniform() * limit;
+    return tofu_random_uniform() * limit;
 }
 
 /* Generate synthetic dataset: 4 classes of 8x8 patterns */
@@ -100,97 +100,97 @@ static void dataset_free(dataset* ds) {
 
 /* Build and forward pass through CNN */
 typedef struct {
-    tl_graph_node* w1;      /* Conv weights: [64, 64] (simulated conv) */
-    tl_graph_node* b1;      /* Conv bias: [64] */
-    tl_graph_node* w2;      /* FC1 weights: [64, 16] */
-    tl_graph_node* b2;      /* FC1 bias: [16] */
-    tl_graph_node* w3;      /* FC2 weights: [16, 4] */
-    tl_graph_node* b3;      /* FC2 bias: [4] */
+    tofu_graph_node* w1;      /* Conv weights: [64, 64] (simulated conv) */
+    tofu_graph_node* b1;      /* Conv bias: [64] */
+    tofu_graph_node* w2;      /* FC1 weights: [64, 16] */
+    tofu_graph_node* b2;      /* FC1 bias: [16] */
+    tofu_graph_node* w3;      /* FC2 weights: [16, 4] */
+    tofu_graph_node* b3;      /* FC2 bias: [4] */
 } cnn_params;
 
-static cnn_params* cnn_create_params(tl_graph* g) {
+static cnn_params* cnn_create_params(tofu_graph* g) {
     cnn_params* p = (cnn_params*)malloc(sizeof(cnn_params));
 
     /* Conv layer: simulate with [64, 64] weight matrix */
     float* w1_data = (float*)malloc(64 * 64 * sizeof(float));
     for (int i = 0; i < 64 * 64; i++) {
-        w1_data[i] = tl_xavier_init(64);
+        w1_data[i] = tofu_xavier_init(64);
     }
-    tl_tensor* t_w1 = tl_tensor_create(w1_data, 2, (int[]){64, 64}, TL_FLOAT);
-    p->w1 = tl_graph_param(g, t_w1);
+    tofu_tensor* t_w1 = tofu_tensor_create(w1_data, 2, (int[]){64, 64}, TOFU_FLOAT);
+    p->w1 = tofu_graph_param(g, t_w1);
 
     /* Conv bias */
     float* b1_data = (float*)calloc(64, sizeof(float));
-    tl_tensor* t_b1 = tl_tensor_create(b1_data, 1, (int[]){64}, TL_FLOAT);
-    p->b1 = tl_graph_param(g, t_b1);
+    tofu_tensor* t_b1 = tofu_tensor_create(b1_data, 1, (int[]){64}, TOFU_FLOAT);
+    p->b1 = tofu_graph_param(g, t_b1);
 
     /* FC1: [64, 16] */
     float* w2_data = (float*)malloc(64 * 16 * sizeof(float));
     for (int i = 0; i < 64 * 16; i++) {
-        w2_data[i] = tl_xavier_init(64);
+        w2_data[i] = tofu_xavier_init(64);
     }
-    tl_tensor* t_w2 = tl_tensor_create(w2_data, 2, (int[]){64, 16}, TL_FLOAT);
-    p->w2 = tl_graph_param(g, t_w2);
+    tofu_tensor* t_w2 = tofu_tensor_create(w2_data, 2, (int[]){64, 16}, TOFU_FLOAT);
+    p->w2 = tofu_graph_param(g, t_w2);
 
     /* FC1 bias */
     float* b2_data = (float*)calloc(16, sizeof(float));
-    tl_tensor* t_b2 = tl_tensor_create(b2_data, 1, (int[]){16}, TL_FLOAT);
-    p->b2 = tl_graph_param(g, t_b2);
+    tofu_tensor* t_b2 = tofu_tensor_create(b2_data, 1, (int[]){16}, TOFU_FLOAT);
+    p->b2 = tofu_graph_param(g, t_b2);
 
     /* FC2: [16, 4] */
     float* w3_data = (float*)malloc(16 * 4 * sizeof(float));
     for (int i = 0; i < 16 * 4; i++) {
-        w3_data[i] = tl_xavier_init(16);
+        w3_data[i] = tofu_xavier_init(16);
     }
-    tl_tensor* t_w3 = tl_tensor_create(w3_data, 2, (int[]){16, 4}, TL_FLOAT);
-    p->w3 = tl_graph_param(g, t_w3);
+    tofu_tensor* t_w3 = tofu_tensor_create(w3_data, 2, (int[]){16, 4}, TOFU_FLOAT);
+    p->w3 = tofu_graph_param(g, t_w3);
 
     /* FC2 bias */
     float* b3_data = (float*)calloc(4, sizeof(float));
-    tl_tensor* t_b3 = tl_tensor_create(b3_data, 1, (int[]){4}, TL_FLOAT);
-    p->b3 = tl_graph_param(g, t_b3);
+    tofu_tensor* t_b3 = tofu_tensor_create(b3_data, 1, (int[]){4}, TOFU_FLOAT);
+    p->b3 = tofu_graph_param(g, t_b3);
 
     return p;
 }
 
 static void cnn_params_free(cnn_params* p) {
     if (!p) return;
-    /* Note: Tensor data and structures are freed by tl_graph_free */
+    /* Note: Tensor data and structures are freed by tofu_graph_free */
     free(p);
 }
 
 /* Forward pass through CNN (returns logits for loss computation) */
-static tl_graph_node* cnn_forward_logits(tl_graph* g, tl_graph_node* input, cnn_params* params) {
+static tofu_graph_node* cnn_forward_logits(tofu_graph* g, tofu_graph_node* input, cnn_params* params) {
     /* Conv layer (simulated): input @ w1 + b1 */
-    tl_graph_node* conv = tl_graph_matmul(g, input, params->w1);
-    tl_graph_node* conv_bias = tl_graph_add(g, conv, params->b1);
+    tofu_graph_node* conv = tofu_graph_matmul(g, input, params->w1);
+    tofu_graph_node* conv_bias = tofu_graph_add(g, conv, params->b1);
 
     /* ReLU activation */
-    tl_graph_node* h1 = tl_graph_relu(g, conv_bias);
+    tofu_graph_node* h1 = tofu_graph_relu(g, conv_bias);
 
     /* FC1: h1 @ w2 + b2 */
-    tl_graph_node* fc1 = tl_graph_matmul(g, h1, params->w2);
-    tl_graph_node* fc1_bias = tl_graph_add(g, fc1, params->b2);
+    tofu_graph_node* fc1 = tofu_graph_matmul(g, h1, params->w2);
+    tofu_graph_node* fc1_bias = tofu_graph_add(g, fc1, params->b2);
 
     /* ReLU activation */
-    tl_graph_node* h2 = tl_graph_relu(g, fc1_bias);
+    tofu_graph_node* h2 = tofu_graph_relu(g, fc1_bias);
 
     /* FC2: h2 @ w3 + b3 (logits) */
-    tl_graph_node* fc2 = tl_graph_matmul(g, h2, params->w3);
-    tl_graph_node* logits = tl_graph_add(g, fc2, params->b3);
+    tofu_graph_node* fc2 = tofu_graph_matmul(g, h2, params->w3);
+    tofu_graph_node* logits = tofu_graph_add(g, fc2, params->b3);
 
     return logits;
 }
 
 /* Forward pass with softmax for inference */
-static tl_graph_node* cnn_forward_probs(tl_graph* g, tl_graph_node* input, cnn_params* params) {
-    tl_graph_node* logits = cnn_forward_logits(g, input, params);
-    tl_graph_node* probs = tl_graph_softmax(g, logits, 1);
+static tofu_graph_node* cnn_forward_probs(tofu_graph* g, tofu_graph_node* input, cnn_params* params) {
+    tofu_graph_node* logits = cnn_forward_logits(g, input, params);
+    tofu_graph_node* probs = tofu_graph_softmax(g, logits, 1);
     return probs;
 }
 
 /* Compute accuracy for a batch */
-static float compute_accuracy(tl_tensor* logits, const int* labels, int batch_size) {
+static float compute_accuracy(tofu_tensor* logits, const int* labels, int batch_size) {
     int correct = 0;
 
     for (int b = 0; b < batch_size; b++) {
@@ -200,7 +200,7 @@ static float compute_accuracy(tl_tensor* logits, const int* labels, int batch_si
         /* Find class with max logit */
         for (int c = 0; c < 4; c++) {
             float logit;
-            TL_TENSOR_DATA_TO(logits, b * 4 + c, logit, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(logits, b * 4 + c, logit, TOFU_FLOAT);
             if (logit > max_logit) {
                 max_logit = logit;
                 pred_class = c;
@@ -236,7 +236,7 @@ int main() {
     assert(ds != NULL);
 
     /* Create computation graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     assert(g != NULL);
 
     /* Create CNN parameters */
@@ -244,7 +244,7 @@ int main() {
     assert(params != NULL);
 
     /* Create optimizer */
-    tl_optimizer* optimizer = tl_optimizer_sgd_create(g, LEARNING_RATE);
+    tofu_optimizer* optimizer = tofu_optimizer_sgd_create(g, LEARNING_RATE);
     assert(optimizer != NULL);
 
     /* Training loop */
@@ -259,7 +259,7 @@ int main() {
             int actual_batch_size = batch_end - batch_start;
 
             /* Clear gradients */
-            tl_graph_zero_grad(g);
+            tofu_graph_zero_grad(g);
 
             /* Prepare input batch */
             float* batch_data = (float*)malloc(actual_batch_size * 64 * sizeof(float));
@@ -273,53 +273,53 @@ int main() {
             }
 
             /* Create input tensor and node */
-            tl_tensor* t_input = tl_tensor_create(batch_data, 2,
-                                                   (int[]){actual_batch_size, 64}, TL_FLOAT);
-            tl_graph_node* input = tl_graph_input(g, t_input);
+            tofu_tensor* t_input = tofu_tensor_create(batch_data, 2,
+                                                   (int[]){actual_batch_size, 64}, TOFU_FLOAT);
+            tofu_graph_node* input = tofu_graph_input(g, t_input);
 
             /* Forward pass with softmax for loss computation */
-            tl_graph_node* probs = cnn_forward_probs(g, input, params);
+            tofu_graph_node* probs = cnn_forward_probs(g, input, params);
 
             /* Prepare target tensor (one-hot encoded) */
             float* target_data = (float*)calloc(actual_batch_size * 4, sizeof(float));
             for (int i = 0; i < actual_batch_size; i++) {
                 target_data[i * 4 + batch_labels[i]] = 1.0f;
             }
-            tl_tensor* t_target = tl_tensor_create(target_data, 2,
-                                                    (int[]){actual_batch_size, 4}, TL_FLOAT);
-            tl_graph_node* target = tl_graph_input(g, t_target);
+            tofu_tensor* t_target = tofu_tensor_create(target_data, 2,
+                                                    (int[]){actual_batch_size, 4}, TOFU_FLOAT);
+            tofu_graph_node* target = tofu_graph_input(g, t_target);
 
             /* Compute cross-entropy loss */
-            tl_graph_node* loss_node = tl_graph_ce_loss(g, probs, target);
+            tofu_graph_node* loss_node = tofu_graph_ce_loss(g, probs, target);
 
             /* Get loss value */
             float batch_loss = 0.0f;
-            tl_tensor* loss_tensor = tl_graph_get_value(loss_node);
+            tofu_tensor* loss_tensor = tofu_graph_get_value(loss_node);
             if (loss_tensor && loss_tensor->len > 0) {
-                TL_TENSOR_DATA_TO(loss_tensor, 0, batch_loss, TL_FLOAT);
+                TOFU_TENSOR_DATA_TO(loss_tensor, 0, batch_loss, TOFU_FLOAT);
             }
 
             total_loss += batch_loss;
 
             /* Compute accuracy from softmax probabilities */
-            tl_tensor* probs_tensor = tl_graph_get_value(probs);
+            tofu_tensor* probs_tensor = tofu_graph_get_value(probs);
             float batch_acc = compute_accuracy(probs_tensor, batch_labels, actual_batch_size);
             total_accuracy += batch_acc * actual_batch_size;
 
             /* Set loss gradient and backward pass */
             if (!loss_node->grad) {
-                loss_node->grad = tl_tensor_create_with_values(
+                loss_node->grad = tofu_tensor_create_with_values(
                     (float[]){1.0f}, 1, (int[]){1}
                 );
             }
-            tl_graph_backward(g, loss_node);
+            tofu_graph_backward(g, loss_node);
 
             /* Optimizer step */
-            tl_optimizer_step(optimizer);
+            tofu_optimizer_step(optimizer);
 
             /* Cleanup batch tensors */
-            tl_tensor_free(t_input);
-            tl_tensor_free(t_target);
+            tofu_tensor_free(t_input);
+            tofu_tensor_free(t_target);
 
             free(batch_data);
             free(batch_labels);
@@ -336,23 +336,23 @@ int main() {
         }
 
         /* Clear graph for next epoch */
-        tl_graph_clear_ops(g);
+        tofu_graph_clear_ops(g);
     }
 
     /* Final evaluation on full dataset */
     printf("\n");
     printf("Final evaluation:\n");
-    tl_graph_clear_ops(g);
-    tl_graph_zero_grad(g);
+    tofu_graph_clear_ops(g);
+    tofu_graph_zero_grad(g);
 
     float* full_batch = (float*)malloc(40 * 64 * sizeof(float));
     memcpy(full_batch, ds->images, 40 * 64 * sizeof(float));
 
-    tl_tensor* t_full = tl_tensor_create(full_batch, 2, (int[]){40, 64}, TL_FLOAT);
-    tl_graph_node* input_full = tl_graph_input(g, t_full);
-    tl_graph_node* probs_full = cnn_forward_probs(g, input_full, params);
+    tofu_tensor* t_full = tofu_tensor_create(full_batch, 2, (int[]){40, 64}, TOFU_FLOAT);
+    tofu_graph_node* input_full = tofu_graph_input(g, t_full);
+    tofu_graph_node* probs_full = cnn_forward_probs(g, input_full, params);
 
-    tl_tensor* probs_tensor = tl_graph_get_value(probs_full);
+    tofu_tensor* probs_tensor = tofu_graph_get_value(probs_full);
     float final_accuracy = compute_accuracy(probs_tensor, ds->labels, 40);
 
     printf("Final accuracy: %.1f%%\n", final_accuracy * 100.0f);
@@ -364,12 +364,12 @@ int main() {
     }
 
     /* Cleanup */
-    tl_tensor_free(t_full);
+    tofu_tensor_free(t_full);
     free(full_batch);
 
-    tl_optimizer_free(optimizer);
+    tofu_optimizer_free(optimizer);
     cnn_params_free(params);
-    tl_graph_free(g);
+    tofu_graph_free(g);
     dataset_free(ds);
 
     printf("\n============================================================\n");

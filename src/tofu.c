@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include "tofu.h"
 
-TL_EXPORT void tl_sprint_version(char *version_str)
+TOFU_EXPORT void tofu_sprint_version(char *version_str)
 {
-    snprintf(version_str, 20, "%d.%d.%d", TL_MAJOR_VERSION, TL_MINOR_VERSION, TL_MICRO_VERSION);
+    snprintf(version_str, 20, "%d.%d.%d", TOFU_MAJOR_VERSION, TOFU_MINOR_VERSION, TOFU_MICRO_VERSION);
 }

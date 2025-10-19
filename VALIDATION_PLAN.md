@@ -28,7 +28,7 @@
 ```c
 void test_gradient_checking() {
     // For each operation (matmul, add, relu, softmax, layer_norm):
-    // 1. Compute analytical gradient via tl_graph_backward()
+    // 1. Compute analytical gradient via tofu_graph_backward()
     // 2. Compute numerical gradient: (f(x+ε) - f(x-ε)) / (2ε)
     // 3. Compare: relative_error = |analytical - numerical| / max(|analytical|, |numerical|)
     // 4. Assert: relative_error < 1e-5
@@ -103,11 +103,11 @@ void test_residual_network() {
     // ResBlock: out = input + F(input)
     // Where F(input) = W2 @ relu(W1 @ input)
     
-    tl_graph_node* x = input;
-    tl_graph_node* h1 = tl_graph_matmul(g, x, W1);
-    tl_graph_node* h1_act = tl_graph_relu(g, h1);
-    tl_graph_node* h2 = tl_graph_matmul(g, h1_act, W2);
-    tl_graph_node* output = tl_graph_add(g, x, h2);  // Skip connection!
+    tofu_graph_node* x = input;
+    tofu_graph_node* h1 = tofu_graph_matmul(g, x, W1);
+    tofu_graph_node* h1_act = tofu_graph_relu(g, h1);
+    tofu_graph_node* h2 = tofu_graph_matmul(g, h1_act, W2);
+    tofu_graph_node* output = tofu_graph_add(g, x, h2);  // Skip connection!
     
     // Train on classification task
     // Verify: loss decreases, gradients flow through both paths
@@ -141,12 +141,12 @@ Input → [Linear → ReLU] × 10 → Linear → Output
 ```c
 void test_deep_network() {
     // Build 10-layer network
-    tl_graph_node* h = input;
+    tofu_graph_node* h = input;
     for (int layer = 0; layer < 10; layer++) {
-        h = tl_graph_matmul(g, h, weights[layer]);
-        h = tl_graph_relu(g, h);
+        h = tofu_graph_matmul(g, h, weights[layer]);
+        h = tofu_graph_relu(g, h);
     }
-    tl_graph_node* output = tl_graph_matmul(g, h, final_weight);
+    tofu_graph_node* output = tofu_graph_matmul(g, h, final_weight);
     
     // Train for 100 epochs
     // Monitor: gradient magnitudes at each layer

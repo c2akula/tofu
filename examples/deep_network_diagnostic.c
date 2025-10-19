@@ -6,18 +6,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "tl_tensor.h"
+#include "tofu_tensor.h"
 
-void relu(tl_tensor* t) {
+void relu(tofu_tensor* t) {
     for (int i = 0; i < t->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(t, i, val, TOFU_FLOAT);
         if (val < 0) val = 0;
-        TL_TENSOR_DATA_FROM(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_FROM(t, i, val, TOFU_FLOAT);
     }
 }
 
-void compute_stats(tl_tensor* t, float* min, float* max, float* mean, int* zero_count) {
+void compute_stats(tofu_tensor* t, float* min, float* max, float* mean, int* zero_count) {
     *min = INFINITY;
     *max = -INFINITY;
     float sum = 0;
@@ -25,7 +25,7 @@ void compute_stats(tl_tensor* t, float* min, float* max, float* mean, int* zero_
 
     for (int i = 0; i < t->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(t, i, val, TOFU_FLOAT);
         sum += val;
         if (val < *min) *min = val;
         if (val > *max) *max = val;
@@ -34,10 +34,10 @@ void compute_stats(tl_tensor* t, float* min, float* max, float* mean, int* zero_
     *mean = sum / t->len;
 }
 
-void init_random(tl_tensor* t, float scale) {
+void init_random(tofu_tensor* t, float scale) {
     for (int i = 0; i < t->len; i++) {
         float val = ((float)rand() / RAND_MAX - 0.5f) * scale;
-        TL_TENSOR_DATA_FROM(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_FROM(t, i, val, TOFU_FLOAT);
     }
 }
 
@@ -54,14 +54,14 @@ int main() {
     printf("Network: 10 layers, %d neurons each\n\n", LAYER_SIZE);
 
     /* Initialize */
-    tl_tensor* layers[DEPTH + 1];
-    tl_tensor* weights[DEPTH];
+    tofu_tensor* layers[DEPTH + 1];
+    tofu_tensor* weights[DEPTH];
 
-    layers[0] = tl_tensor_zeros(2, (int[]){1, LAYER_SIZE}, TL_FLOAT);
+    layers[0] = tofu_tensor_zeros(2, (int[]){1, LAYER_SIZE}, TOFU_FLOAT);
     init_random(layers[0], 1.0f);
 
     for (int i = 0; i < DEPTH; i++) {
-        weights[i] = tl_tensor_zeros(2, (int[]){LAYER_SIZE, LAYER_SIZE}, TL_FLOAT);
+        weights[i] = tofu_tensor_zeros(2, (int[]){LAYER_SIZE, LAYER_SIZE}, TOFU_FLOAT);
         init_random(weights[i], 0.1f);
     }
 
@@ -78,7 +78,7 @@ int main() {
 
     for (int i = 0; i < DEPTH; i++) {
         /* Before activation */
-        layers[i + 1] = tl_tensor_matmul(layers[i], weights[i], NULL);
+        layers[i + 1] = tofu_tensor_matmul(layers[i], weights[i], NULL);
         if (!layers[i + 1]) {
             fprintf(stderr, "Layer %d matmul failed\n", i);
             return 1;
@@ -120,10 +120,10 @@ int main() {
 
     /* Cleanup */
     for (int i = 0; i <= DEPTH; i++) {
-        tl_tensor_free_data_too(layers[i]);
+        tofu_tensor_free_data_too(layers[i]);
     }
     for (int i = 0; i < DEPTH; i++) {
-        tl_tensor_free_data_too(weights[i]);
+        tofu_tensor_free_data_too(weights[i]);
     }
 
     printf("================================================================\n");

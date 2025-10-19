@@ -31,18 +31,18 @@ output = input + F(input)
 where F(input) = W2 @ relu(W1 @ input)
 ```
 
-This is implemented in the `tl_residual_block()` function:
+This is implemented in the `tofu_residual_block()` function:
 
 ```c
-tl_graph_node* tl_residual_block(tl_graph* g, tl_graph_node* input,
-                                 tl_graph_node* W1, tl_graph_node* W2) {
+tofu_graph_node* tofu_residual_block(tofu_graph* g, tofu_graph_node* input,
+                                 tofu_graph_node* W1, tofu_graph_node* W2) {
     /* F(input) = W2 @ relu(W1 @ input) */
-    tl_graph_node* h1 = tl_graph_matmul(g, input, W1);
-    tl_graph_node* h1_act = tl_graph_relu(g, h1);
-    tl_graph_node* F_output = tl_graph_matmul(g, h1_act, W2);
+    tofu_graph_node* h1 = tofu_graph_matmul(g, input, W1);
+    tofu_graph_node* h1_act = tofu_graph_relu(g, h1);
+    tofu_graph_node* F_output = tofu_graph_matmul(g, h1_act, W2);
 
     /* Skip connection: output = input + F(input) */
-    tl_graph_node* output = tl_graph_add(g, input, F_output);
+    tofu_graph_node* output = tofu_graph_add(g, input, F_output);
 
     return output;
 }
@@ -58,7 +58,7 @@ tl_graph_node* tl_residual_block(tl_graph* g, tl_graph_node* input,
 - **Data generation**: Class-specific bias with random noise for separability
 
 ```c
-void tl_generate_dataset(float* X, int* y) {
+void tofu_generate_dataset(float* X, int* y) {
     for (int c = 0; c < NUM_CLASSES; c++) {
         for (int s = 0; s < SAMPLES_PER_CLASS; s++) {
             /* Generate feature vectors with class-specific bias */
@@ -89,7 +89,7 @@ void tl_generate_dataset(float* X, int* y) {
 Uses Xavier uniform initialization to ensure healthy gradient flow:
 
 ```c
-float tl_xavier_init() {
+float tofu_xavier_init() {
     float limit = sqrtf(6.0f / (INPUT_SIZE + HIDDEN_SIZE));
     return ((float)rand() / RAND_MAX - 0.5f) * 2.0f * limit;
 }
@@ -99,35 +99,35 @@ float tl_xavier_init() {
 
 The training loop follows this pattern for 100 epochs:
 
-1. **Clear graph** - Remove previous operations with `tl_graph_clear_ops(g)`
+1. **Clear graph** - Remove previous operations with `tofu_graph_clear_ops(g)`
 2. **Forward pass** - Build computation graph through both residual blocks
 3. **Loss computation** - Calculate softmax + cross-entropy loss
-4. **Backward pass** - Automatic differentiation with `tl_graph_backward()`
-5. **Parameter update** - SGD step with `tl_optimizer_step()`
+4. **Backward pass** - Automatic differentiation with `tofu_graph_backward()`
+5. **Parameter update** - SGD step with `tofu_optimizer_step()`
 6. **Memory cleanup** - Free temporary tensors
 
 ```c
 for (int epoch = 0; epoch < NUM_EPOCHS; epoch++) {
     for (int i = 0; i < NUM_SAMPLES; i++) {
         /* 1. Clear and prepare */
-        tl_graph_clear_ops(g);
-        tl_optimizer_zero_grad(optimizer);
+        tofu_graph_clear_ops(g);
+        tofu_optimizer_zero_grad(optimizer);
 
         /* 2. Forward pass through residual blocks */
-        tl_graph_node* x_node = tl_graph_input(g, t_input);
-        tl_graph_node* res_block1 = tl_residual_block(g, x_node, W1_param, W2_param);
-        tl_graph_node* res_block2 = tl_residual_block(g, res_block1, W3_param, W4_param);
-        tl_graph_node* logits = tl_graph_matmul(g, res_block2, W5_param);
+        tofu_graph_node* x_node = tofu_graph_input(g, t_input);
+        tofu_graph_node* res_block1 = tofu_residual_block(g, x_node, W1_param, W2_param);
+        tofu_graph_node* res_block2 = tofu_residual_block(g, res_block1, W3_param, W4_param);
+        tofu_graph_node* logits = tofu_graph_matmul(g, res_block2, W5_param);
 
         /* 3. Compute loss */
-        tl_graph_node* softmax_out = tl_graph_softmax(g, logits, 0);
-        tl_graph_node* loss = tl_graph_ce_loss(g, softmax_out, y_node);
+        tofu_graph_node* softmax_out = tofu_graph_softmax(g, logits, 0);
+        tofu_graph_node* loss = tofu_graph_ce_loss(g, softmax_out, y_node);
 
         /* 4. Backward pass */
-        tl_graph_backward(g, loss);
+        tofu_graph_backward(g, loss);
 
         /* 5. Update parameters */
-        tl_optimizer_step(optimizer);
+        tofu_optimizer_step(optimizer);
     }
 }
 ```
@@ -145,10 +145,10 @@ The skip connections (element-wise addition) ensure gradients flow directly thro
 
 ### 2. Graph-based Computation
 
-Uses Tofu's `tl_graph` API for efficient automatic differentiation:
+Uses Tofu's `tofu_graph` API for efficient automatic differentiation:
 
-- **Parameters** created with `tl_graph_param()` - trainable weights
-- **Inputs** created with `tl_graph_input()` - data nodes
+- **Parameters** created with `tofu_graph_param()` - trainable weights
+- **Inputs** created with `tofu_graph_input()` - data nodes
 - **Operations** compose the forward pass
 - **Backward** automatically differentiates
 
@@ -158,14 +158,14 @@ Proper cleanup after each training iteration:
 
 ```c
 /* Forward pass and backward */
-tl_graph_backward(g, loss);
+tofu_graph_backward(g, loss);
 
 /* Parameter update */
-tl_optimizer_step(optimizer);
+tofu_optimizer_step(optimizer);
 
 /* Cleanup sample data */
-tl_tensor_free(t_input);
-tl_tensor_free(t_label);
+tofu_tensor_free(t_input);
+tofu_tensor_free(t_label);
 free(sample_data);
 free(label_data);
 ```
@@ -234,19 +234,19 @@ The training completes in a few seconds with output showing:
 
 | API | Purpose |
 |-----|---------|
-| `tl_graph_create()` | Create computation graph |
-| `tl_graph_param()` | Create trainable parameter nodes |
-| `tl_graph_input()` | Create input data nodes |
-| `tl_graph_matmul()` | Matrix multiplication operation |
-| `tl_graph_add()` | Element-wise addition (skip connection) |
-| `tl_graph_relu()` | ReLU activation |
-| `tl_graph_softmax()` | Softmax operation |
-| `tl_graph_ce_loss()` | Cross-entropy loss |
-| `tl_graph_backward()` | Backward pass (automatic differentiation) |
-| `tl_graph_clear_ops()` | Clear operations for new forward pass |
-| `tl_optimizer_sgd_create()` | Create SGD optimizer |
-| `tl_optimizer_zero_grad()` | Zero parameter gradients |
-| `tl_optimizer_step()` | Perform parameter update |
+| `tofu_graph_create()` | Create computation graph |
+| `tofu_graph_param()` | Create trainable parameter nodes |
+| `tofu_graph_input()` | Create input data nodes |
+| `tofu_graph_matmul()` | Matrix multiplication operation |
+| `tofu_graph_add()` | Element-wise addition (skip connection) |
+| `tofu_graph_relu()` | ReLU activation |
+| `tofu_graph_softmax()` | Softmax operation |
+| `tofu_graph_ce_loss()` | Cross-entropy loss |
+| `tofu_graph_backward()` | Backward pass (automatic differentiation) |
+| `tofu_graph_clear_ops()` | Clear operations for new forward pass |
+| `tofu_optimizer_sgd_create()` | Create SGD optimizer |
+| `tofu_optimizer_zero_grad()` | Zero parameter gradients |
+| `tofu_optimizer_step()` | Perform parameter update |
 
 ### Memory Model
 
@@ -302,14 +302,14 @@ To modify the example:
 
 ```c
 /* In main training loop */
-tl_graph_node* res_block3 = tl_residual_block(g, res_block2, W3_param, W4_param);
-tl_graph_node* logits = tl_graph_matmul(g, res_block3, W5_param);
+tofu_graph_node* res_block3 = tofu_residual_block(g, res_block2, W3_param, W4_param);
+tofu_graph_node* logits = tofu_graph_matmul(g, res_block3, W5_param);
 ```
 
 ### Use Different Optimizer
 
 ```c
-tl_optimizer* optimizer = tl_optimizer_sgd_momentum_create(g, 0.01, 0.9);
+tofu_optimizer* optimizer = tofu_optimizer_sgd_momentum_create(g, 0.01, 0.9);
 ```
 
 ## Code Quality
@@ -328,9 +328,9 @@ tl_optimizer* optimizer = tl_optimizer_sgd_momentum_create(g, 0.01, 0.9);
 ## References
 
 - Phase 2 Validation: `PHASE2_RESULTS.md`
-- Tofu Graph API: `src/tl_graph.h`
-- Optimizer API: `src/tl_optimizer.h`
-- Tensor API: `src/tl_tensor.h`
+- Tofu Graph API: `src/tofu_graph.h`
+- Optimizer API: `src/tofu_optimizer.h`
+- Tensor API: `src/tofu_tensor.h`
 
 ## Performance Characteristics
 

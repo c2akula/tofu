@@ -8,8 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "tl_graph.h"
-#include "tl_tensor.h"
+#include "tofu_graph.h"
+#include "tofu_tensor.h"
 
 #define EPSILON 1e-7
 #define TOLERANCE 1e-5  /* Much stricter tolerance with double precision */
@@ -99,28 +99,28 @@ int main() {
 
     /* Compute analytical gradients using Tofu */
     printf("Computing analytical gradients using Tofu (float)...\n");
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_A = tl_tensor_create(A_data_f, 2, (int[]){M, K}, TL_FLOAT);
-    tl_tensor* t_B = tl_tensor_create(B_data_f, 2, (int[]){K, N}, TL_FLOAT);
+    tofu_tensor* t_A = tofu_tensor_create(A_data_f, 2, (int[]){M, K}, TOFU_FLOAT);
+    tofu_tensor* t_B = tofu_tensor_create(B_data_f, 2, (int[]){K, N}, TOFU_FLOAT);
 
-    tl_graph_node* A = tl_graph_input(g, t_A);
-    tl_graph_node* B = tl_graph_input(g, t_B);
+    tofu_graph_node* A = tofu_graph_input(g, t_A);
+    tofu_graph_node* B = tofu_graph_input(g, t_B);
     A->requires_grad = 1;
     B->requires_grad = 1;
 
-    tl_graph_node* C = tl_graph_matmul(g, A, B);
+    tofu_graph_node* C = tofu_graph_matmul(g, A, B);
 
     /* Set gradient to ones */
-    C->grad = tl_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f},
+    C->grad = tofu_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f},
                                             2, (int[]){M, N});
-    tl_graph_backward(g, C);
+    tofu_graph_backward(g, C);
 
     printf("Analytical gradients (from Tofu):\n");
     printf("  dL/dA:\n");
     for (int i = 0; i < M * K; i++) {
         float grad_val;
-        TL_TENSOR_DATA_TO(A->grad, i, grad_val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(A->grad, i, grad_val, TOFU_FLOAT);
         printf("    A[%d]: %.6f\n", i, grad_val);
     }
 
@@ -137,7 +137,7 @@ int main() {
         double numerical = compute_numerical_gradient_double(A_data, i, M, K, N, B_data);
 
         float analytical_f;
-        TL_TENSOR_DATA_TO(A->grad, i, analytical_f, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(A->grad, i, analytical_f, TOFU_FLOAT);
         double analytical = (double)analytical_f;
 
         double error = fabs(analytical - numerical);
@@ -176,9 +176,9 @@ int main() {
     }
 
     /* Cleanup */
-    tl_tensor_free(t_A);
-    tl_tensor_free(t_B);
-    tl_graph_free(g);
+    tofu_tensor_free(t_A);
+    tofu_tensor_free(t_B);
+    tofu_graph_free(g);
 
     printf("\n============================================================\n");
 

@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
-#include "tl_graph.h"
-#include "tl_tensor.h"
+#include "tofu_graph.h"
+#include "tofu_tensor.h"
 
 #define TEST_PASS 0
 #define TEST_FAIL 1
@@ -46,59 +46,59 @@ int test_zero_matrix_matmul() {
     float A_data[4] = {0, 0, 0, 0};  /* 2x2 zero matrix */
     float B_data[4] = {1, 2, 3, 4};  /* 2x2 non-zero matrix */
 
-    tl_tensor* A = tl_tensor_create(A_data, 2, (int[]){2, 2}, TL_FLOAT);
-    tl_tensor* B = tl_tensor_create(B_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tofu_tensor* A = tofu_tensor_create(A_data, 2, (int[]){2, 2}, TOFU_FLOAT);
+    tofu_tensor* B = tofu_tensor_create(B_data, 2, (int[]){2, 2}, TOFU_FLOAT);
 
-    tl_tensor* C = tl_tensor_matmul(A, B, NULL);
+    tofu_tensor* C = tofu_tensor_matmul(A, B, NULL);
 
     /* Result should be all zeros */
     int all_zero = 1;
     for (int i = 0; i < 4; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C, i, val, TOFU_FLOAT);
         if (fabsf(val) > 1e-7f) {
             all_zero = 0;
             break;
         }
     }
 
-    tl_tensor_free(A);
-    tl_tensor_free(B);
-    tl_tensor_free_data_too(C);
+    tofu_tensor_free(A);
+    tofu_tensor_free(B);
+    tofu_tensor_free_data_too(C);
 
     return all_zero ? TEST_PASS : TEST_FAIL;
 }
 
 int test_zero_gradient() {
     /* Test: Backward pass with zero gradients */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
     float x_data[4] = {1, 2, 3, 4};
     float W_data[4] = {1, 0, 0, 1};
 
-    tl_tensor* t_x = tl_tensor_create(x_data, 2, (int[]){2, 2}, TL_FLOAT);
-    tl_tensor* t_W = tl_tensor_create(W_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, 2, (int[]){2, 2}, TOFU_FLOAT);
+    tofu_tensor* t_W = tofu_tensor_create(W_data, 2, (int[]){2, 2}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* W = tl_graph_param(g, t_W);
-    tl_graph_node* y = tl_graph_matmul(g, x, W);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* W = tofu_graph_param(g, t_W);
+    tofu_graph_node* y = tofu_graph_matmul(g, x, W);
 
     /* Manually set output gradient to zero */
     if (y->grad) {
         for (int i = 0; i < y->grad->len; i++) {
             float zero = 0.0f;
-            TL_TENSOR_DATA_FROM(y->grad, i, zero, TL_FLOAT);
+            TOFU_TENSOR_DATA_FROM(y->grad, i, zero, TOFU_FLOAT);
         }
     }
 
-    tl_graph_backward(g, y);
+    tofu_graph_backward(g, y);
 
     /* Gradients should be zero or NULL */
     int pass = (W->grad == NULL || W->grad->len == 0);
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_W);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_W);
+    tofu_graph_free(g);
 
     return pass ? TEST_PASS : TEST_FAIL;
 }
@@ -112,25 +112,25 @@ int test_nan_detection() {
     float A_data[4] = {NAN, 1, 2, 3};
     float B_data[4] = {1, 2, 3, 4};
 
-    tl_tensor* A = tl_tensor_create(A_data, 2, (int[]){2, 2}, TL_FLOAT);
-    tl_tensor* B = tl_tensor_create(B_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tofu_tensor* A = tofu_tensor_create(A_data, 2, (int[]){2, 2}, TOFU_FLOAT);
+    tofu_tensor* B = tofu_tensor_create(B_data, 2, (int[]){2, 2}, TOFU_FLOAT);
 
-    tl_tensor* C = tl_tensor_matmul(A, B, NULL);
+    tofu_tensor* C = tofu_tensor_matmul(A, B, NULL);
 
     /* Check if NaN propagated */
     int has_nan = 0;
     for (int i = 0; i < C->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C, i, val, TOFU_FLOAT);
         if (isnan(val)) {
             has_nan = 1;
             break;
         }
     }
 
-    tl_tensor_free(A);
-    tl_tensor_free(B);
-    tl_tensor_free_data_too(C);
+    tofu_tensor_free(A);
+    tofu_tensor_free(B);
+    tofu_tensor_free_data_too(C);
 
     /* Document behavior: NaN propagates */
     return has_nan ? TEST_PASS : TEST_FAIL;
@@ -141,25 +141,25 @@ int test_inf_handling() {
     float A_data[4] = {INFINITY, 1, 2, 3};
     float B_data[4] = {1, 2, 3, 4};
 
-    tl_tensor* A = tl_tensor_create(A_data, 2, (int[]){2, 2}, TL_FLOAT);
-    tl_tensor* B = tl_tensor_create(B_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tofu_tensor* A = tofu_tensor_create(A_data, 2, (int[]){2, 2}, TOFU_FLOAT);
+    tofu_tensor* B = tofu_tensor_create(B_data, 2, (int[]){2, 2}, TOFU_FLOAT);
 
-    tl_tensor* C = tl_tensor_matmul(A, B, NULL);
+    tofu_tensor* C = tofu_tensor_matmul(A, B, NULL);
 
     /* Check if Inf exists in output */
     int has_inf = 0;
     for (int i = 0; i < C->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C, i, val, TOFU_FLOAT);
         if (isinf(val)) {
             has_inf = 1;
             break;
         }
     }
 
-    tl_tensor_free(A);
-    tl_tensor_free(B);
-    tl_tensor_free_data_too(C);
+    tofu_tensor_free(A);
+    tofu_tensor_free(B);
+    tofu_tensor_free_data_too(C);
 
     /* Document: Inf propagates */
     return has_inf ? TEST_PASS : TEST_FAIL;
@@ -175,25 +175,25 @@ int test_large_values() {
     float A_data[4] = {large, 0, 0, large};
     float B_data[4] = {1, 0, 0, 1};  /* Identity-like */
 
-    tl_tensor* A = tl_tensor_create(A_data, 2, (int[]){2, 2}, TL_FLOAT);
-    tl_tensor* B = tl_tensor_create(B_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tofu_tensor* A = tofu_tensor_create(A_data, 2, (int[]){2, 2}, TOFU_FLOAT);
+    tofu_tensor* B = tofu_tensor_create(B_data, 2, (int[]){2, 2}, TOFU_FLOAT);
 
-    tl_tensor* C = tl_tensor_matmul(A, B, NULL);
+    tofu_tensor* C = tofu_tensor_matmul(A, B, NULL);
 
     /* Check result is still finite */
     int all_finite = 1;
     for (int i = 0; i < C->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C, i, val, TOFU_FLOAT);
         if (!isfinite(val)) {
             all_finite = 0;
             break;
         }
     }
 
-    tl_tensor_free(A);
-    tl_tensor_free(B);
-    tl_tensor_free_data_too(C);
+    tofu_tensor_free(A);
+    tofu_tensor_free(B);
+    tofu_tensor_free_data_too(C);
 
     return all_finite ? TEST_PASS : TEST_FAIL;
 }
@@ -204,25 +204,25 @@ int test_small_values() {
     float A_data[4] = {small, small, small, small};
     float B_data[4] = {1, 1, 1, 1};
 
-    tl_tensor* A = tl_tensor_create(A_data, 2, (int[]){2, 2}, TL_FLOAT);
-    tl_tensor* B = tl_tensor_create(B_data, 2, (int[]){2, 2}, TL_FLOAT);
+    tofu_tensor* A = tofu_tensor_create(A_data, 2, (int[]){2, 2}, TOFU_FLOAT);
+    tofu_tensor* B = tofu_tensor_create(B_data, 2, (int[]){2, 2}, TOFU_FLOAT);
 
-    tl_tensor* C = tl_tensor_matmul(A, B, NULL);
+    tofu_tensor* C = tofu_tensor_matmul(A, B, NULL);
 
     /* Result should be finite (possibly zero due to underflow) */
     int all_finite = 1;
     for (int i = 0; i < C->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C, i, val, TOFU_FLOAT);
         if (!isfinite(val)) {
             all_finite = 0;
             break;
         }
     }
 
-    tl_tensor_free(A);
-    tl_tensor_free(B);
-    tl_tensor_free_data_too(C);
+    tofu_tensor_free(A);
+    tofu_tensor_free(B);
+    tofu_tensor_free_data_too(C);
 
     return all_finite ? TEST_PASS : TEST_FAIL;
 }
@@ -236,19 +236,19 @@ int test_1x1_matrix() {
     float A_data[1] = {5.0f};
     float B_data[1] = {3.0f};
 
-    tl_tensor* A = tl_tensor_create(A_data, 2, (int[]){1, 1}, TL_FLOAT);
-    tl_tensor* B = tl_tensor_create(B_data, 2, (int[]){1, 1}, TL_FLOAT);
+    tofu_tensor* A = tofu_tensor_create(A_data, 2, (int[]){1, 1}, TOFU_FLOAT);
+    tofu_tensor* B = tofu_tensor_create(B_data, 2, (int[]){1, 1}, TOFU_FLOAT);
 
-    tl_tensor* C = tl_tensor_matmul(A, B, NULL);
+    tofu_tensor* C = tofu_tensor_matmul(A, B, NULL);
 
     float result;
-    TL_TENSOR_DATA_TO(C, 0, result, TL_FLOAT);
+    TOFU_TENSOR_DATA_TO(C, 0, result, TOFU_FLOAT);
 
     int correct = (fabsf(result - 15.0f) < 1e-5f);  /* 5 * 3 = 15 */
 
-    tl_tensor_free(A);
-    tl_tensor_free(B);
-    tl_tensor_free_data_too(C);
+    tofu_tensor_free(A);
+    tofu_tensor_free(B);
+    tofu_tensor_free_data_too(C);
 
     return correct ? TEST_PASS : TEST_FAIL;
 }

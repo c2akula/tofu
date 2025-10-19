@@ -14,11 +14,11 @@
 
 ## Code Style Guidelines
 - **Formatting**: 4-space indentation, K&R brace style
-- **Naming**: snake_case for functions/variables, prefix with `tl_`
+- **Naming**: snake_case for functions/variables, prefix with `tofu_`
 - **Error Handling**: Use `assert()` for internal validation
-- **Types**: Use explicit types from `tl_type.h` (TL_INT32, TL_FLOAT, etc.)
+- **Types**: Use explicit types from `tofu_type.h` (TOFU_INT32, TOFU_FLOAT, etc.)
 - **Headers**: Include guards with `_H` suffix
 - **Documentation**: Use C-style comments with function descriptions
 - **Memory**: Always free allocated resources, check for NULL
-- **Exports**: Use TL_EXPORT macro for public API functions
+- **Exports**: Use TOFU_EXPORT macro for public API functions
 - **Testing**: Every function should have corresponding test in test/ directory

@@ -21,34 +21,34 @@
 ```c
 /* Operation types */
 typedef enum {
-    TL_OP_INPUT,      /* Leaf node (data) */
-    TL_OP_PARAM,      /* Trainable parameter */
-    TL_OP_MATMUL,     /* Matrix multiplication */
-    TL_OP_ADD,        /* Element-wise addition */
-    TL_OP_MUL,        /* Element-wise multiplication */
-    TL_OP_RELU,       /* ReLU activation */
-    TL_OP_SOFTMAX,    /* Softmax */
-    TL_OP_LAYER_NORM, /* Layer normalization */
-    TL_OP_RESHAPE,    /* Reshape operation */
-    TL_OP_TRANSPOSE,  /* Transpose */
-    TL_OP_MEAN,       /* Mean reduction */
-    TL_OP_MSE_LOSS,   /* Mean squared error loss */
-    TL_OP_CE_LOSS     /* Cross-entropy loss */
-} tl_op_type;
+    TOFU_OP_INPUT,      /* Leaf node (data) */
+    TOFU_OP_PARAM,      /* Trainable parameter */
+    TOFU_OP_MATMUL,     /* Matrix multiplication */
+    TOFU_OP_ADD,        /* Element-wise addition */
+    TOFU_OP_MUL,        /* Element-wise multiplication */
+    TOFU_OP_RELU,       /* ReLU activation */
+    TOFU_OP_SOFTMAX,    /* Softmax */
+    TOFU_OP_LAYER_NORM, /* Layer normalization */
+    TOFU_OP_RESHAPE,    /* Reshape operation */
+    TOFU_OP_TRANSPOSE,  /* Transpose */
+    TOFU_OP_MEAN,       /* Mean reduction */
+    TOFU_OP_MSE_LOSS,   /* Mean squared error loss */
+    TOFU_OP_CE_LOSS     /* Cross-entropy loss */
+} tofu_op_type;
 
 /* Computation graph node */
-typedef struct tl_graph_node {
+typedef struct tofu_graph_node {
     int id;                           /* Unique node ID */
-    tl_op_type op;                    /* Operation type */
-    tl_tensor* value;                 /* Forward pass result */
-    tl_tensor* grad;                  /* Gradient (∂L/∂value) */
+    tofu_op_type op;                    /* Operation type */
+    tofu_tensor* value;                 /* Forward pass result */
+    tofu_tensor* grad;                  /* Gradient (∂L/∂value) */
 
     /* Topology */
-    struct tl_graph_node** inputs;    /* Input nodes */
+    struct tofu_graph_node** inputs;    /* Input nodes */
     int num_inputs;                   /* Number of inputs */
 
     /* Backward pass function */
-    void (*backward_fn)(struct tl_graph_node* node);
+    void (*backward_fn)(struct tofu_graph_node* node);
 
     /* Operation-specific context */
     void* backward_ctx;               /* e.g., saved tensors for backward */
@@ -56,52 +56,52 @@ typedef struct tl_graph_node {
     /* Memory management */
     int ref_count;                    /* Reference counting */
     int requires_grad;                /* Does this need gradient? */
-} tl_graph_node;
+} tofu_graph_node;
 
 /* Computation graph */
-typedef struct tl_graph {
-    tl_graph_node** nodes;            /* All nodes */
+typedef struct tofu_graph {
+    tofu_graph_node** nodes;            /* All nodes */
     int num_nodes;                    /* Number of nodes */
     int capacity;                     /* Allocated capacity */
 
     /* Topological order for backward pass */
-    tl_graph_node** topo_order;
+    tofu_graph_node** topo_order;
     int topo_size;
 
     /* Memory arena for efficient allocation */
     void* arena;
-} tl_graph;
+} tofu_graph;
 ```
 
 ### API Design
 
 ```c
 /* Graph lifecycle */
-tl_graph* tl_graph_create();
-void tl_graph_free(tl_graph* g);
+tofu_graph* tofu_graph_create();
+void tofu_graph_free(tofu_graph* g);
 
 /* Build graph (record operations) */
-tl_graph_node* tl_graph_input(tl_graph* g, tl_tensor* data);
-tl_graph_node* tl_graph_param(tl_graph* g, tl_tensor* data);
+tofu_graph_node* tofu_graph_input(tofu_graph* g, tofu_tensor* data);
+tofu_graph_node* tofu_graph_param(tofu_graph* g, tofu_tensor* data);
 
 /* Operations (return new nodes) */
-tl_graph_node* tl_graph_matmul(tl_graph* g, tl_graph_node* a, tl_graph_node* b);
-tl_graph_node* tl_graph_add(tl_graph* g, tl_graph_node* a, tl_graph_node* b);
-tl_graph_node* tl_graph_relu(tl_graph* g, tl_graph_node* x);
-tl_graph_node* tl_graph_softmax(tl_graph* g, tl_graph_node* x, int axis);
-tl_graph_node* tl_graph_layer_norm(tl_graph* g, tl_graph_node* x,
-                                   tl_graph_node* gamma, tl_graph_node* beta,
+tofu_graph_node* tofu_graph_matmul(tofu_graph* g, tofu_graph_node* a, tofu_graph_node* b);
+tofu_graph_node* tofu_graph_add(tofu_graph* g, tofu_graph_node* a, tofu_graph_node* b);
+tofu_graph_node* tofu_graph_relu(tofu_graph* g, tofu_graph_node* x);
+tofu_graph_node* tofu_graph_softmax(tofu_graph* g, tofu_graph_node* x, int axis);
+tofu_graph_node* tofu_graph_layer_norm(tofu_graph* g, tofu_graph_node* x,
+                                   tofu_graph_node* gamma, tofu_graph_node* beta,
                                    int axis, double eps);
 
 /* Loss functions */
-tl_graph_node* tl_graph_mse_loss(tl_graph* g, tl_graph_node* pred, tl_graph_node* target);
-tl_graph_node* tl_graph_cross_entropy(tl_graph* g, tl_graph_node* logits, tl_graph_node* labels);
+tofu_graph_node* tofu_graph_mse_loss(tofu_graph* g, tofu_graph_node* pred, tofu_graph_node* target);
+tofu_graph_node* tofu_graph_cross_entropy(tofu_graph* g, tofu_graph_node* logits, tofu_graph_node* labels);
 
 /* Backward pass */
-void tl_graph_backward(tl_graph* g, tl_graph_node* loss);
+void tofu_graph_backward(tofu_graph* g, tofu_graph_node* loss);
 
 /* Access gradients */
-tl_tensor* tl_graph_get_grad(tl_graph_node* node);
+tofu_tensor* tofu_graph_get_grad(tofu_graph_node* node);
 ```
 
 ---
@@ -111,22 +111,22 @@ tl_tensor* tl_graph_get_grad(tl_graph_node* node);
 **Duration**: 1-2 hours
 
 ### Tasks
-- [ ] Implement `tl_graph` structure
-- [ ] Implement `tl_graph_create()` and `tl_graph_free()`
-- [ ] Implement `tl_graph_node` creation
-- [ ] Implement `tl_graph_input()` and `tl_graph_param()`
+- [ ] Implement `tofu_graph` structure
+- [ ] Implement `tofu_graph_create()` and `tofu_graph_free()`
+- [ ] Implement `tofu_graph_node` creation
+- [ ] Implement `tofu_graph_input()` and `tofu_graph_param()`
 - [ ] Add dynamic array for node storage
 - [ ] Memory management (ref counting basics)
 
 ### Test Strategy
 ```c
 /* Test: Create graph and add nodes */
-tl_graph* g = tl_graph_create();
-tl_tensor* data = tl_tensor_zeros(2, (int[]){2, 3}, TL_FLOAT);
-tl_graph_node* x = tl_graph_input(g, data);
-assert(x->op == TL_OP_INPUT);
+tofu_graph* g = tofu_graph_create();
+tofu_tensor* data = tofu_tensor_zeros(2, (int[]){2, 3}, TOFU_FLOAT);
+tofu_graph_node* x = tofu_graph_input(g, data);
+assert(x->op == TOFU_OP_INPUT);
 assert(x->value == data);
-tl_graph_free(g);
+tofu_graph_free(g);
 ```
 
 ### Success Criteria
@@ -141,21 +141,21 @@ tl_graph_free(g);
 **Duration**: 2-3 hours
 
 ### Tasks
-- [ ] Implement `tl_graph_matmul()`
-- [ ] Implement `tl_graph_add()` (element-wise)
-- [ ] Implement `tl_graph_relu()`
-- [ ] Implement `tl_graph_softmax()`
-- [ ] Implement `tl_graph_layer_norm()`
+- [ ] Implement `tofu_graph_matmul()`
+- [ ] Implement `tofu_graph_add()` (element-wise)
+- [ ] Implement `tofu_graph_relu()`
+- [ ] Implement `tofu_graph_softmax()`
+- [ ] Implement `tofu_graph_layer_norm()`
 - [ ] Implement topological sort for execution order
 
 ### Test Strategy
 ```c
 /* Test: Build and execute forward pass */
-tl_graph* g = tl_graph_create();
-tl_graph_node* x = tl_graph_input(g, input_data);
-tl_graph_node* W = tl_graph_param(g, weights);
-tl_graph_node* y = tl_graph_matmul(g, x, W);
-tl_graph_node* z = tl_graph_relu(g, y);
+tofu_graph* g = tofu_graph_create();
+tofu_graph_node* x = tofu_graph_input(g, input_data);
+tofu_graph_node* W = tofu_graph_param(g, weights);
+tofu_graph_node* y = tofu_graph_matmul(g, x, W);
+tofu_graph_node* z = tofu_graph_relu(g, y);
 
 /* Verify forward values are computed */
 assert(z->value != NULL);
@@ -178,7 +178,7 @@ assert(z->value->ndim == 2);
 - [ ] Implement `matmul_backward()`
 - [ ] Implement `add_backward()`
 - [ ] Implement `relu_backward()`
-- [ ] Implement `tl_graph_backward()`
+- [ ] Implement `tofu_graph_backward()`
 - [ ] Gradient accumulation (for nodes with multiple consumers)
 
 ### Gradient Formulas
@@ -197,13 +197,13 @@ assert(z->value->ndim == 2);
 ### Test Strategy
 ```c
 /* Test: Gradient through simple network */
-tl_graph* g = tl_graph_create();
-tl_graph_node* x = tl_graph_param(g, input_data);  /* requires_grad=true */
-tl_graph_node* W = tl_graph_param(g, weights);
-tl_graph_node* y = tl_graph_matmul(g, x, W);
-tl_graph_node* loss = tl_graph_mse_loss(g, y, target);
+tofu_graph* g = tofu_graph_create();
+tofu_graph_node* x = tofu_graph_param(g, input_data);  /* requires_grad=true */
+tofu_graph_node* W = tofu_graph_param(g, weights);
+tofu_graph_node* y = tofu_graph_matmul(g, x, W);
+tofu_graph_node* loss = tofu_graph_mse_loss(g, y, target);
 
-tl_graph_backward(g, loss);
+tofu_graph_backward(g, loss);
 
 /* Verify gradients computed */
 assert(W->grad != NULL);
@@ -247,11 +247,11 @@ assert(fabs(numerical_grad - computed_grad) < 1e-4);
 ### Test Strategy
 ```c
 /* Test: Full transformer block backward */
-tl_graph* g = tl_graph_create();
+tofu_graph* g = tofu_graph_create();
 // Build: LayerNorm -> Attention -> Residual -> LayerNorm -> FFN -> Residual
 // ... (simplified)
-tl_graph_node* loss = tl_graph_cross_entropy(g, output, labels);
-tl_graph_backward(g, loss);
+tofu_graph_node* loss = tofu_graph_cross_entropy(g, output, labels);
+tofu_graph_backward(g, loss);
 
 /* Verify all parameters have gradients */
 assert(all_params_have_grads(g));
@@ -272,7 +272,7 @@ assert(no_nan_or_inf_grads(g));
 **Duration**: 1-2 hours
 
 ### Tasks
-- [ ] Implement `tl_optimizer_sgd()`
+- [ ] Implement `tofu_optimizer_sgd()`
 - [ ] Implement parameter update
 - [ ] Zero gradients between steps
 - [ ] Optional: momentum, weight decay
@@ -280,18 +280,18 @@ assert(no_nan_or_inf_grads(g));
 ### API Design
 ```c
 typedef struct {
-    tl_graph_node** params;
+    tofu_graph_node** params;
     int num_params;
     float lr;
     float momentum;
     float weight_decay;
-    tl_tensor** velocity;  /* For momentum */
-} tl_optimizer_sgd;
+    tofu_tensor** velocity;  /* For momentum */
+} tofu_optimizer_sgd;
 
-tl_optimizer_sgd* tl_optimizer_sgd_create(tl_graph* g, float lr);
-void tl_optimizer_step(tl_optimizer_sgd* opt);
-void tl_optimizer_zero_grad(tl_graph* g);
-void tl_optimizer_free(tl_optimizer_sgd* opt);
+tofu_optimizer_sgd* tofu_optimizer_sgd_create(tofu_graph* g, float lr);
+void tofu_optimizer_step(tofu_optimizer_sgd* opt);
+void tofu_optimizer_zero_grad(tofu_graph* g);
+void tofu_optimizer_free(tofu_optimizer_sgd* opt);
 ```
 
 ### Test Strategy
@@ -300,9 +300,9 @@ void tl_optimizer_free(tl_optimizer_sgd* opt);
 float initial_loss = evaluate_loss(model, data);
 for (int i = 0; i < 100; i++) {
     forward_pass();
-    tl_graph_backward(g, loss);
-    tl_optimizer_step(opt);
-    tl_optimizer_zero_grad(g);
+    tofu_graph_backward(g, loss);
+    tofu_optimizer_step(opt);
+    tofu_optimizer_zero_grad(g);
 }
 float final_loss = evaluate_loss(model, data);
 assert(final_loss < initial_loss);
@@ -454,6 +454,6 @@ assert(final_loss < initial_loss);
 ## Next Immediate Action
 
 **Start Sprint 1**: Implement core graph infrastructure
-- Create `src/tl_graph.h` and `src/tl_graph.c`
+- Create `src/tofu_graph.h` and `src/tofu_graph.c`
 - Implement basic data structures
-- Write initial tests in `test/test_tl_graph.c`
+- Write initial tests in `test/test_tofu_graph.c`

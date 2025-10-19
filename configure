@@ -17,9 +17,9 @@ my $micro = 0;
 my %customs =
     (
      "TARGET" => "tofu",
-     "ABBR" => "TL",
-     "abbr" => "tl",
-     "EXPORT_HEADERS" => "src/tl_tensor.h src/tl_check.h src/tl_type.h src/tl_util.h",
+     "ABBR" => "TOFU",
+     "abbr" => "tofu",
+     "EXPORT_HEADERS" => "src/tofu_tensor.h src/tofu_check.h src/tofu_type.h src/tofu_util.h",
      "BUILDTOOLS_DIR" => "tools/buildtools",
      "SRC_DIR" => "src",
      "SRC_SUB_DIRS" => "",

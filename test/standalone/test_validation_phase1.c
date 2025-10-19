@@ -16,9 +16,9 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
-#include "tl_graph.h"
-#include "tl_tensor.h"
-#include "tl_optimizer.h"
+#include "tofu_graph.h"
+#include "tofu_tensor.h"
+#include "tofu_optimizer.h"
 
 #define EPSILON 1e-5f
 #define TOLERANCE 3e-1f  /* 30% relative error - float precision severely limits numerical gradient accuracy
@@ -82,26 +82,26 @@ typedef struct {
 static float matmul_loss_fn(float* param_data, void* ctx) {
     matmul_context* mc = (matmul_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_A = tl_tensor_create(mc->A_data, 2, (int[]){mc->M, mc->K}, TL_FLOAT);
-    tl_tensor* t_B = tl_tensor_create(mc->B_data, 2, (int[]){mc->K, mc->N}, TL_FLOAT);
+    tofu_tensor* t_A = tofu_tensor_create(mc->A_data, 2, (int[]){mc->M, mc->K}, TOFU_FLOAT);
+    tofu_tensor* t_B = tofu_tensor_create(mc->B_data, 2, (int[]){mc->K, mc->N}, TOFU_FLOAT);
 
-    tl_graph_node* A = tl_graph_input(g, t_A);
-    tl_graph_node* B = tl_graph_input(g, t_B);
-    tl_graph_node* C = tl_graph_matmul(g, A, B);
+    tofu_graph_node* A = tofu_graph_input(g, t_A);
+    tofu_graph_node* B = tofu_graph_input(g, t_B);
+    tofu_graph_node* C = tofu_graph_matmul(g, A, B);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < C->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
-    tl_tensor_free(t_A);
-    tl_tensor_free(t_B);
-    tl_graph_free(g);
+    tofu_tensor_free(t_A);
+    tofu_tensor_free(t_B);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -120,28 +120,28 @@ static void test_gradient_checking_matmul() {
                       -0.1f, 0.4f};
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_A = tl_tensor_create(A_data, 2, (int[]){M, K}, TL_FLOAT);
-    tl_tensor* t_B = tl_tensor_create(B_data, 2, (int[]){K, N}, TL_FLOAT);
+    tofu_tensor* t_A = tofu_tensor_create(A_data, 2, (int[]){M, K}, TOFU_FLOAT);
+    tofu_tensor* t_B = tofu_tensor_create(B_data, 2, (int[]){K, N}, TOFU_FLOAT);
 
-    tl_graph_node* A = tl_graph_input(g, t_A);
-    tl_graph_node* B = tl_graph_input(g, t_B);
+    tofu_graph_node* A = tofu_graph_input(g, t_A);
+    tofu_graph_node* B = tofu_graph_input(g, t_B);
     A->requires_grad = 1;  /* Enable gradient computation for inputs */
     B->requires_grad = 1;
-    tl_graph_node* C = tl_graph_matmul(g, A, B);
+    tofu_graph_node* C = tofu_graph_matmul(g, A, B);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < C->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(C->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(C->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
     /* Backward pass - gradient of loss w.r.t. C is all ones */
-    C->grad = tl_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 2, (int[]){M, N});
-    tl_graph_backward(g, C);
+    C->grad = tofu_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 2, (int[]){M, N});
+    tofu_graph_backward(g, C);
 
     /* Check gradients for A */
     printf("  Checking dL/dA:\n");
@@ -150,7 +150,7 @@ static void test_gradient_checking_matmul() {
 
     for (int i = 0; i < M * K; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(A->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(A->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(A_data, i, M * K, matmul_loss_fn, &ctx_A);
         float error = relative_error(analytical, numerical);
@@ -175,7 +175,7 @@ static void test_gradient_checking_matmul() {
 
     for (int i = 0; i < K * N; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(B->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(B->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(B_data, i, K * N, matmul_loss_fn, &ctx_B);
         float error = relative_error(analytical, numerical);
@@ -195,9 +195,9 @@ static void test_gradient_checking_matmul() {
 
     assert(num_errors_A == 0 && num_errors_B == 0);
 
-    tl_tensor_free(t_A);
-    tl_tensor_free(t_B);
-    tl_graph_free(g);
+    tofu_tensor_free(t_A);
+    tofu_tensor_free(t_B);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -217,26 +217,26 @@ typedef struct {
 static float add_loss_fn(float* param_data, void* ctx) {
     add_context* ac = (add_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(ac->x_data, 1, (int[]){ac->len}, TL_FLOAT);
-    tl_tensor* t_y = tl_tensor_create(ac->y_data, 1, (int[]){ac->len}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(ac->x_data, 1, (int[]){ac->len}, TOFU_FLOAT);
+    tofu_tensor* t_y = tofu_tensor_create(ac->y_data, 1, (int[]){ac->len}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_input(g, t_y);
-    tl_graph_node* z = tl_graph_add(g, x, y);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_input(g, t_y);
+    tofu_graph_node* z = tofu_graph_add(g, x, y);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < z->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(z->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(z->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_y);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_y);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -250,28 +250,28 @@ static void test_gradient_checking_add() {
     float y_data[] = {0.5f, -0.3f, 0.8f, -0.2f};
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(x_data, 1, (int[]){len}, TL_FLOAT);
-    tl_tensor* t_y = tl_tensor_create(y_data, 1, (int[]){len}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, 1, (int[]){len}, TOFU_FLOAT);
+    tofu_tensor* t_y = tofu_tensor_create(y_data, 1, (int[]){len}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_input(g, t_y);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_input(g, t_y);
     x->requires_grad = 1;  /* Enable gradient computation for inputs */
     y->requires_grad = 1;
-    tl_graph_node* z = tl_graph_add(g, x, y);
+    tofu_graph_node* z = tofu_graph_add(g, x, y);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < z->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(z->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(z->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
     /* Backward pass */
-    z->grad = tl_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
-    tl_graph_backward(g, z);
+    z->grad = tofu_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
+    tofu_graph_backward(g, z);
 
     /* Check gradients for x */
     printf("  Checking dL/dx:\n");
@@ -280,7 +280,7 @@ static void test_gradient_checking_add() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(x->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(x_data, i, len, add_loss_fn, &ctx_x);
         float error = relative_error(analytical, numerical);
@@ -305,7 +305,7 @@ static void test_gradient_checking_add() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(y->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(y_data, i, len, add_loss_fn, &ctx_y);
         float error = relative_error(analytical, numerical);
@@ -325,9 +325,9 @@ static void test_gradient_checking_add() {
 
     assert(num_errors_x == 0 && num_errors_y == 0);
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_y);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_y);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -346,22 +346,22 @@ typedef struct {
 static float relu_loss_fn(float* param_data, void* ctx) {
     relu_context* rc = (relu_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(rc->x_data, 1, (int[]){rc->len}, TL_FLOAT);
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_relu(g, x);
+    tofu_tensor* t_x = tofu_tensor_create(rc->x_data, 1, (int[]){rc->len}, TOFU_FLOAT);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_relu(g, x);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
-    tl_tensor_free(t_x);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -375,24 +375,24 @@ static void test_gradient_checking_relu() {
     float x_data[] = {-2.0f, -0.5f, -0.01f, 0.01f, 0.5f, 2.0f};
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(x_data, 1, (int[]){len}, TL_FLOAT);
-    tl_graph_node* x = tl_graph_input(g, t_x);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, 1, (int[]){len}, TOFU_FLOAT);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
     x->requires_grad = 1;  /* Enable gradient computation for inputs */
-    tl_graph_node* y = tl_graph_relu(g, x);
+    tofu_graph_node* y = tofu_graph_relu(g, x);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
     /* Backward pass */
-    y->grad = tl_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
-    tl_graph_backward(g, y);
+    y->grad = tofu_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
+    tofu_graph_backward(g, y);
 
     /* Check gradients for x */
     printf("  Checking dL/dx:\n");
@@ -401,7 +401,7 @@ static void test_gradient_checking_relu() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(x->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(x_data, i, len, relu_loss_fn, &ctx);
         float error = relative_error(analytical, numerical);
@@ -421,8 +421,8 @@ static void test_gradient_checking_relu() {
 
     assert(num_errors == 0);
 
-    tl_tensor_free(t_x);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -443,22 +443,22 @@ typedef struct {
 static float softmax_loss_fn(float* param_data, void* ctx) {
     softmax_context* sc = (softmax_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(sc->x_data, 2, (int[]){sc->batch_size, sc->num_classes}, TL_FLOAT);
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_softmax(g, x, 1);
+    tofu_tensor* t_x = tofu_tensor_create(sc->x_data, 2, (int[]){sc->batch_size, sc->num_classes}, TOFU_FLOAT);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_softmax(g, x, 1);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
-    tl_tensor_free(t_x);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -476,25 +476,25 @@ static void test_gradient_checking_softmax() {
     };
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(x_data, 2, (int[]){batch_size, num_classes}, TL_FLOAT);
-    tl_graph_node* x = tl_graph_input(g, t_x);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, 2, (int[]){batch_size, num_classes}, TOFU_FLOAT);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
     x->requires_grad = 1;  /* Enable gradient computation for inputs */
-    tl_graph_node* y = tl_graph_softmax(g, x, 1);
+    tofu_graph_node* y = tofu_graph_softmax(g, x, 1);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
     /* Backward pass */
     float grad_data[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
-    y->grad = tl_tensor_create_with_values(grad_data, 2, (int[]){batch_size, num_classes});
-    tl_graph_backward(g, y);
+    y->grad = tofu_tensor_create_with_values(grad_data, 2, (int[]){batch_size, num_classes});
+    tofu_graph_backward(g, y);
 
     /* Check gradients for x */
     printf("  Checking dL/dx:\n");
@@ -503,7 +503,7 @@ static void test_gradient_checking_softmax() {
 
     for (int i = 0; i < batch_size * num_classes; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(x->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(x_data, i, batch_size * num_classes, softmax_loss_fn, &ctx);
         float error = relative_error(analytical, numerical);
@@ -523,8 +523,8 @@ static void test_gradient_checking_softmax() {
 
     assert(num_errors == 0);
 
-    tl_tensor_free(t_x);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -544,26 +544,26 @@ typedef struct {
 static float mul_loss_fn(float* param_data, void* ctx) {
     mul_context* mc = (mul_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(mc->x_data, 1, (int[]){mc->len}, TL_FLOAT);
-    tl_tensor* t_y = tl_tensor_create(mc->y_data, 1, (int[]){mc->len}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(mc->x_data, 1, (int[]){mc->len}, TOFU_FLOAT);
+    tofu_tensor* t_y = tofu_tensor_create(mc->y_data, 1, (int[]){mc->len}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_input(g, t_y);
-    tl_graph_node* z = tl_graph_mul(g, x, y);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_input(g, t_y);
+    tofu_graph_node* z = tofu_graph_mul(g, x, y);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < z->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(z->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(z->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_y);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_y);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -577,28 +577,28 @@ static void test_gradient_checking_mul() {
     float y_data[] = {0.5f, -0.3f, 0.8f, -0.2f};
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(x_data, 1, (int[]){len}, TL_FLOAT);
-    tl_tensor* t_y = tl_tensor_create(y_data, 1, (int[]){len}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, 1, (int[]){len}, TOFU_FLOAT);
+    tofu_tensor* t_y = tofu_tensor_create(y_data, 1, (int[]){len}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_input(g, t_y);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_input(g, t_y);
     x->requires_grad = 1;  /* Enable gradient computation for inputs */
     y->requires_grad = 1;
-    tl_graph_node* z = tl_graph_mul(g, x, y);
+    tofu_graph_node* z = tofu_graph_mul(g, x, y);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < z->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(z->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(z->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
     /* Backward pass */
-    z->grad = tl_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
-    tl_graph_backward(g, z);
+    z->grad = tofu_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
+    tofu_graph_backward(g, z);
 
     /* Check gradients for x */
     printf("  Checking dL/dx:\n");
@@ -607,7 +607,7 @@ static void test_gradient_checking_mul() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(x->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(x_data, i, len, mul_loss_fn, &ctx_x);
         float error = relative_error(analytical, numerical);
@@ -632,7 +632,7 @@ static void test_gradient_checking_mul() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(y->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(y_data, i, len, mul_loss_fn, &ctx_y);
         float error = relative_error(analytical, numerical);
@@ -652,9 +652,9 @@ static void test_gradient_checking_mul() {
 
     assert(num_errors_x == 0 && num_errors_y == 0);
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_y);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_y);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -677,22 +677,22 @@ typedef struct {
 static float transpose_loss_fn(float* param_data, void* ctx) {
     transpose_context* tc = (transpose_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(tc->x_data, tc->ndim, tc->dims, TL_FLOAT);
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* y = tl_graph_transpose(g, x, tc->axes);
+    tofu_tensor* t_x = tofu_tensor_create(tc->x_data, tc->ndim, tc->dims, TOFU_FLOAT);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* y = tofu_graph_transpose(g, x, tc->axes);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
-    tl_tensor_free(t_x);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -711,18 +711,18 @@ static void test_gradient_checking_transpose() {
     };
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(x_data, ndim, dims, TL_FLOAT);
-    tl_graph_node* x = tl_graph_input(g, t_x);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, ndim, dims, TOFU_FLOAT);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
     x->requires_grad = 1;  /* Enable gradient computation for input */
-    tl_graph_node* y = tl_graph_transpose(g, x, axes);
+    tofu_graph_node* y = tofu_graph_transpose(g, x, axes);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
@@ -731,10 +731,10 @@ static void test_gradient_checking_transpose() {
     for (int i = 0; i < y->value->len; i++) {
         grad_data[i] = 1.0f;
     }
-    y->grad = tl_tensor_create_with_values(grad_data, ndim, y->value->dims);
+    y->grad = tofu_tensor_create_with_values(grad_data, ndim, y->value->dims);
     free(grad_data);
 
-    tl_graph_backward(g, y);
+    tofu_graph_backward(g, y);
 
     /* Check gradients for x */
     printf("  Checking dL/dx:\n");
@@ -743,7 +743,7 @@ static void test_gradient_checking_transpose() {
 
     for (int i = 0; i < t_x->len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(x->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(x_data, i, t_x->len, transpose_loss_fn, &ctx);
         float error = relative_error(analytical, numerical);
@@ -763,8 +763,8 @@ static void test_gradient_checking_transpose() {
 
     assert(num_errors == 0);
 
-    tl_tensor_free(t_x);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -794,15 +794,15 @@ static void test_known_solution_linear_regression() {
     float w_data[] = {0.0f};  /* Will learn → 2.0 */
     float b_data[] = {0.0f};  /* Will learn → 3.0 */
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_w = tl_tensor_create(w_data, 1, (int[]){1}, TL_FLOAT);
-    tl_tensor* t_b = tl_tensor_create(b_data, 1, (int[]){1}, TL_FLOAT);
+    tofu_tensor* t_w = tofu_tensor_create(w_data, 1, (int[]){1}, TOFU_FLOAT);
+    tofu_tensor* t_b = tofu_tensor_create(b_data, 1, (int[]){1}, TOFU_FLOAT);
 
-    tl_graph_node* param_w = tl_graph_param(g, t_w);
-    tl_graph_node* param_b = tl_graph_param(g, t_b);
+    tofu_graph_node* param_w = tofu_graph_param(g, t_w);
+    tofu_graph_node* param_b = tofu_graph_param(g, t_b);
 
-    tl_optimizer* opt = tl_optimizer_sgd_create(g, 0.1);
+    tofu_optimizer* opt = tofu_optimizer_sgd_create(g, 0.1);
 
     int epochs = 100;
     float initial_loss = 0.0f;
@@ -812,33 +812,33 @@ static void test_known_solution_linear_regression() {
         float epoch_loss = 0.0f;
 
         for (int i = 0; i < num_samples; i++) {
-            tl_optimizer_zero_grad(opt);
+            tofu_optimizer_zero_grad(opt);
 
             /* Forward pass: pred = w * x + b */
             float x_data[] = {x_vals[i]};
-            tl_tensor* t_x = tl_tensor_create(x_data, 1, (int[]){1}, TL_FLOAT);
-            tl_graph_node* x = tl_graph_input(g, t_x);
+            tofu_tensor* t_x = tofu_tensor_create(x_data, 1, (int[]){1}, TOFU_FLOAT);
+            tofu_graph_node* x = tofu_graph_input(g, t_x);
 
-            tl_graph_node* wx = tl_graph_mul(g, param_w, x);
-            tl_graph_node* pred = tl_graph_add(g, wx, param_b);
+            tofu_graph_node* wx = tofu_graph_mul(g, param_w, x);
+            tofu_graph_node* pred = tofu_graph_add(g, wx, param_b);
 
             /* Compute loss: MSE = (pred - y)^2 */
             float pred_val;
-            TL_TENSOR_DATA_TO(pred->value, 0, pred_val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(pred->value, 0, pred_val, TOFU_FLOAT);
             float error = pred_val - y_vals[i];
             float loss = error * error;
             epoch_loss += loss;
 
             /* Backward pass */
             float grad_val = 2.0f * error;
-            pred->grad = tl_tensor_create_with_values(&grad_val, 1, (int[]){1});
-            tl_graph_backward(g, pred);
+            pred->grad = tofu_tensor_create_with_values(&grad_val, 1, (int[]){1});
+            tofu_graph_backward(g, pred);
 
             /* Update parameters */
-            tl_optimizer_step(opt);
+            tofu_optimizer_step(opt);
 
-            tl_tensor_free(t_x);
-            tl_graph_clear_ops(g);
+            tofu_tensor_free(t_x);
+            tofu_graph_clear_ops(g);
         }
 
         epoch_loss /= num_samples;
@@ -852,16 +852,16 @@ static void test_known_solution_linear_regression() {
 
         if (epoch % 20 == 0 || epoch == epochs - 1) {
             float w_val, b_val;
-            TL_TENSOR_DATA_TO(param_w->value, 0, w_val, TL_FLOAT);
-            TL_TENSOR_DATA_TO(param_b->value, 0, b_val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(param_w->value, 0, w_val, TOFU_FLOAT);
+            TOFU_TENSOR_DATA_TO(param_b->value, 0, b_val, TOFU_FLOAT);
             printf("  Epoch %3d: loss=%.6f, w=%.4f, b=%.4f\n", epoch, epoch_loss, w_val, b_val);
         }
     }
 
     /* Check if converged to correct values */
     float final_w, final_b;
-    TL_TENSOR_DATA_TO(param_w->value, 0, final_w, TL_FLOAT);
-    TL_TENSOR_DATA_TO(param_b->value, 0, final_b, TL_FLOAT);
+    TOFU_TENSOR_DATA_TO(param_w->value, 0, final_w, TOFU_FLOAT);
+    TOFU_TENSOR_DATA_TO(param_b->value, 0, final_b, TOFU_FLOAT);
 
     float w_error = fabsf(final_w - 2.0f);
     float b_error = fabsf(final_b - 3.0f);
@@ -874,10 +874,10 @@ static void test_known_solution_linear_regression() {
     assert(b_error < 0.1f);
     assert(final_loss < initial_loss);
 
-    tl_optimizer_free(opt);
-    tl_tensor_free(t_w);
-    tl_tensor_free(t_b);
-    tl_graph_free(g);
+    tofu_optimizer_free(opt);
+    tofu_tensor_free(t_w);
+    tofu_tensor_free(t_b);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED (converged to analytical solution)\n");
 }
@@ -912,19 +912,19 @@ static void test_known_solution_xor() {
     float W2_data[4] = {0.5f, -0.5f, 0.3f, -0.3f};
     float b2_data[1] = {0.1f};
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_W1 = tl_tensor_create(W1_data, 2, (int[]){input_dim, hidden_dim}, TL_FLOAT);
-    tl_tensor* t_b1 = tl_tensor_create(b1_data, 1, (int[]){hidden_dim}, TL_FLOAT);
-    tl_tensor* t_W2 = tl_tensor_create(W2_data, 2, (int[]){hidden_dim, output_dim}, TL_FLOAT);
-    tl_tensor* t_b2 = tl_tensor_create(b2_data, 1, (int[]){output_dim}, TL_FLOAT);
+    tofu_tensor* t_W1 = tofu_tensor_create(W1_data, 2, (int[]){input_dim, hidden_dim}, TOFU_FLOAT);
+    tofu_tensor* t_b1 = tofu_tensor_create(b1_data, 1, (int[]){hidden_dim}, TOFU_FLOAT);
+    tofu_tensor* t_W2 = tofu_tensor_create(W2_data, 2, (int[]){hidden_dim, output_dim}, TOFU_FLOAT);
+    tofu_tensor* t_b2 = tofu_tensor_create(b2_data, 1, (int[]){output_dim}, TOFU_FLOAT);
 
-    tl_graph_node* W1 = tl_graph_param(g, t_W1);
-    tl_graph_node* b1 = tl_graph_param(g, t_b1);
-    tl_graph_node* W2 = tl_graph_param(g, t_W2);
-    tl_graph_node* b2 = tl_graph_param(g, t_b2);
+    tofu_graph_node* W1 = tofu_graph_param(g, t_W1);
+    tofu_graph_node* b1 = tofu_graph_param(g, t_b1);
+    tofu_graph_node* W2 = tofu_graph_param(g, t_W2);
+    tofu_graph_node* b2 = tofu_graph_param(g, t_b2);
 
-    tl_optimizer* opt = tl_optimizer_sgd_create(g, 0.1);
+    tofu_optimizer* opt = tofu_optimizer_sgd_create(g, 0.1);
 
     int epochs = 100;  /* Reduced from 500 - converges faster with proper LR */
     float initial_loss = 0.0f;
@@ -934,35 +934,35 @@ static void test_known_solution_xor() {
         float epoch_loss = 0.0f;
 
         for (int sample = 0; sample < 4; sample++) {
-            tl_optimizer_zero_grad(opt);
+            tofu_optimizer_zero_grad(opt);
 
             /* Forward pass */
-            tl_tensor* t_x = tl_tensor_create(X[sample], 1, (int[]){input_dim}, TL_FLOAT);
-            tl_graph_node* x = tl_graph_input(g, t_x);
+            tofu_tensor* t_x = tofu_tensor_create(X[sample], 1, (int[]){input_dim}, TOFU_FLOAT);
+            tofu_graph_node* x = tofu_graph_input(g, t_x);
 
-            tl_graph_node* h1 = tl_graph_matmul(g, x, W1);
-            tl_graph_node* h1_bias = tl_graph_add(g, h1, b1);
-            tl_graph_node* h1_act = tl_graph_relu(g, h1_bias);
-            tl_graph_node* h2 = tl_graph_matmul(g, h1_act, W2);
-            tl_graph_node* output = tl_graph_add(g, h2, b2);
+            tofu_graph_node* h1 = tofu_graph_matmul(g, x, W1);
+            tofu_graph_node* h1_bias = tofu_graph_add(g, h1, b1);
+            tofu_graph_node* h1_act = tofu_graph_relu(g, h1_bias);
+            tofu_graph_node* h2 = tofu_graph_matmul(g, h1_act, W2);
+            tofu_graph_node* output = tofu_graph_add(g, h2, b2);
 
             /* Compute loss: MSE */
             float pred;
-            TL_TENSOR_DATA_TO(output->value, 0, pred, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(output->value, 0, pred, TOFU_FLOAT);
             float error = pred - Y[sample];
             float loss = error * error;
             epoch_loss += loss;
 
             /* Backward pass */
             float grad_val = 2.0f * error;
-            output->grad = tl_tensor_create_with_values(&grad_val, 1, (int[]){output_dim});
-            tl_graph_backward(g, output);
+            output->grad = tofu_tensor_create_with_values(&grad_val, 1, (int[]){output_dim});
+            tofu_graph_backward(g, output);
 
             /* Update */
-            tl_optimizer_step(opt);
+            tofu_optimizer_step(opt);
 
-            tl_tensor_free(t_x);
-            tl_graph_clear_ops(g);
+            tofu_tensor_free(t_x);
+            tofu_graph_clear_ops(g);
         }
 
         epoch_loss /= 4.0f;
@@ -982,17 +982,17 @@ static void test_known_solution_xor() {
     /* Test accuracy */
     int correct = 0;
     for (int sample = 0; sample < 4; sample++) {
-        tl_tensor* t_x = tl_tensor_create(X[sample], 1, (int[]){input_dim}, TL_FLOAT);
-        tl_graph_node* x = tl_graph_input(g, t_x);
+        tofu_tensor* t_x = tofu_tensor_create(X[sample], 1, (int[]){input_dim}, TOFU_FLOAT);
+        tofu_graph_node* x = tofu_graph_input(g, t_x);
 
-        tl_graph_node* h1 = tl_graph_matmul(g, x, W1);
-        tl_graph_node* h1_bias = tl_graph_add(g, h1, b1);
-        tl_graph_node* h1_act = tl_graph_relu(g, h1_bias);
-        tl_graph_node* h2 = tl_graph_matmul(g, h1_act, W2);
-        tl_graph_node* output = tl_graph_add(g, h2, b2);
+        tofu_graph_node* h1 = tofu_graph_matmul(g, x, W1);
+        tofu_graph_node* h1_bias = tofu_graph_add(g, h1, b1);
+        tofu_graph_node* h1_act = tofu_graph_relu(g, h1_bias);
+        tofu_graph_node* h2 = tofu_graph_matmul(g, h1_act, W2);
+        tofu_graph_node* output = tofu_graph_add(g, h2, b2);
 
         float pred;
-        TL_TENSOR_DATA_TO(output->value, 0, pred, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output->value, 0, pred, TOFU_FLOAT);
         int pred_class = (pred > 0.5f) ? 1 : 0;
         int true_class = (Y[sample] > 0.5f) ? 1 : 0;
 
@@ -1000,8 +1000,8 @@ static void test_known_solution_xor() {
             correct++;
         }
 
-        tl_tensor_free(t_x);
-        tl_graph_clear_ops(g);
+        tofu_tensor_free(t_x);
+        tofu_graph_clear_ops(g);
     }
 
     float accuracy = (float)correct / 4.0f * 100.0f;
@@ -1010,12 +1010,12 @@ static void test_known_solution_xor() {
     assert(accuracy == 100.0f);
     assert(final_loss < initial_loss);
 
-    tl_optimizer_free(opt);
-    tl_tensor_free(t_W1);
-    tl_tensor_free(t_b1);
-    tl_tensor_free(t_W2);
-    tl_tensor_free(t_b2);
-    tl_graph_free(g);
+    tofu_optimizer_free(opt);
+    tofu_tensor_free(t_W1);
+    tofu_tensor_free(t_b1);
+    tofu_tensor_free(t_W2);
+    tofu_tensor_free(t_b2);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED (100%% accuracy achieved)\n");
 }
@@ -1053,35 +1053,35 @@ typedef struct {
 static float layer_norm_loss_fn(float* param_data, void* ctx) {
     layer_norm_context* lnc = (layer_norm_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(lnc->x_data, 2,
-                                      (int[]){lnc->batch_size, lnc->feature_dim}, TL_FLOAT);
-    tl_tensor* t_gamma = tl_tensor_create(lnc->gamma_data, 1,
-                                          (int[]){lnc->feature_dim}, TL_FLOAT);
-    tl_tensor* t_beta = tl_tensor_create(lnc->beta_data, 1,
-                                         (int[]){lnc->feature_dim}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(lnc->x_data, 2,
+                                      (int[]){lnc->batch_size, lnc->feature_dim}, TOFU_FLOAT);
+    tofu_tensor* t_gamma = tofu_tensor_create(lnc->gamma_data, 1,
+                                          (int[]){lnc->feature_dim}, TOFU_FLOAT);
+    tofu_tensor* t_beta = tofu_tensor_create(lnc->beta_data, 1,
+                                         (int[]){lnc->feature_dim}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* gamma = tl_graph_param(g, t_gamma);
-    tl_graph_node* beta = tl_graph_param(g, t_beta);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* gamma = tofu_graph_param(g, t_gamma);
+    tofu_graph_node* beta = tofu_graph_param(g, t_beta);
 
     /* Layer norm along axis 1 (normalize features) */
-    tl_graph_node* y = tl_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
+    tofu_graph_node* y = tofu_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
 
     /* Compute weighted loss matching the backward gradient weights */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         float weight = (lnc->weights != NULL) ? lnc->weights[i] : 1.0f;
         loss += weight * val;
     }
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_gamma);
-    tl_tensor_free(t_beta);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_gamma);
+    tofu_tensor_free(t_beta);
+    tofu_graph_free(g);
 
     return loss;
 }
@@ -1106,18 +1106,18 @@ static void test_gradient_checking_layer_norm() {
     float beta_data[] = {0.0f, 0.0f, 0.0f, 0.0f};
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_x = tl_tensor_create(x_data, 2,
-                                      (int[]){batch_size, feature_dim}, TL_FLOAT);
-    tl_tensor* t_gamma = tl_tensor_create(gamma_data, 1,
-                                          (int[]){feature_dim}, TL_FLOAT);
-    tl_tensor* t_beta = tl_tensor_create(beta_data, 1,
-                                         (int[]){feature_dim}, TL_FLOAT);
+    tofu_tensor* t_x = tofu_tensor_create(x_data, 2,
+                                      (int[]){batch_size, feature_dim}, TOFU_FLOAT);
+    tofu_tensor* t_gamma = tofu_tensor_create(gamma_data, 1,
+                                          (int[]){feature_dim}, TOFU_FLOAT);
+    tofu_tensor* t_beta = tofu_tensor_create(beta_data, 1,
+                                         (int[]){feature_dim}, TOFU_FLOAT);
 
-    tl_graph_node* x = tl_graph_input(g, t_x);
-    tl_graph_node* gamma = tl_graph_param(g, t_gamma);
-    tl_graph_node* beta = tl_graph_param(g, t_beta);
+    tofu_graph_node* x = tofu_graph_input(g, t_x);
+    tofu_graph_node* gamma = tofu_graph_param(g, t_gamma);
+    tofu_graph_node* beta = tofu_graph_param(g, t_beta);
 
     /* Enable gradient computation */
     x->requires_grad = 1;
@@ -1125,13 +1125,13 @@ static void test_gradient_checking_layer_norm() {
     beta->requires_grad = 1;
 
     /* Layer norm along axis 1 (normalize features dimension) */
-    tl_graph_node* y = tl_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
+    tofu_graph_node* y = tofu_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
 
     /* Compute scalar loss: sum of all outputs */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(y->value, i, val, TOFU_FLOAT);
         loss += val;
     }
 
@@ -1139,8 +1139,8 @@ static void test_gradient_checking_layer_norm() {
      * Layer norm gradients can cancel when output gradient is uniform,
      * so use: [1, 0.5, -0.5, -1, 1, 0.5, -0.5, -1] */
     float grad_data[] = {1.0f, 0.5f, -0.5f, -1.0f, 1.0f, 0.5f, -0.5f, -1.0f};
-    y->grad = tl_tensor_create_with_values(grad_data, 2, (int[]){batch_size, feature_dim});
-    tl_graph_backward(g, y);
+    y->grad = tofu_tensor_create_with_values(grad_data, 2, (int[]){batch_size, feature_dim});
+    tofu_graph_backward(g, y);
 
     /* === Check gradient w.r.t. input x === */
     printf("  Checking dL/dx (input gradient):\n");
@@ -1149,7 +1149,7 @@ static void test_gradient_checking_layer_norm() {
 
     for (int i = 0; i < batch_size * feature_dim; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(x->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(x_data, i, batch_size * feature_dim,
                                                      layer_norm_loss_fn, &ctx_x);
@@ -1175,7 +1175,7 @@ static void test_gradient_checking_layer_norm() {
 
     for (int i = 0; i < feature_dim; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(gamma->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(gamma->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(gamma_data, i, feature_dim,
                                                      layer_norm_loss_fn, &ctx_gamma);
@@ -1201,7 +1201,7 @@ static void test_gradient_checking_layer_norm() {
 
     for (int i = 0; i < feature_dim; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(beta->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(beta->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(beta_data, i, feature_dim,
                                                      layer_norm_loss_fn, &ctx_beta);
@@ -1222,10 +1222,10 @@ static void test_gradient_checking_layer_norm() {
 
     assert(num_errors_x == 0 && num_errors_gamma == 0 && num_errors_beta == 0);
 
-    tl_tensor_free(t_x);
-    tl_tensor_free(t_gamma);
-    tl_tensor_free(t_beta);
-    tl_graph_free(g);
+    tofu_tensor_free(t_x);
+    tofu_tensor_free(t_gamma);
+    tofu_tensor_free(t_beta);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -1245,22 +1245,22 @@ typedef struct {
 static float mse_loss_fn(float* param_data, void* ctx) {
     mse_loss_context* mc = (mse_loss_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_pred = tl_tensor_create(mc->pred_data, 1, (int[]){mc->len}, TL_FLOAT);
-    tl_tensor* t_target = tl_tensor_create(mc->target_data, 1, (int[]){mc->len}, TL_FLOAT);
+    tofu_tensor* t_pred = tofu_tensor_create(mc->pred_data, 1, (int[]){mc->len}, TOFU_FLOAT);
+    tofu_tensor* t_target = tofu_tensor_create(mc->target_data, 1, (int[]){mc->len}, TOFU_FLOAT);
 
-    tl_graph_node* pred = tl_graph_input(g, t_pred);
-    tl_graph_node* target = tl_graph_input(g, t_target);
-    tl_graph_node* loss = tl_graph_mse_loss(g, pred, target);
+    tofu_graph_node* pred = tofu_graph_input(g, t_pred);
+    tofu_graph_node* target = tofu_graph_input(g, t_target);
+    tofu_graph_node* loss = tofu_graph_mse_loss(g, pred, target);
 
     /* Extract loss value */
     float loss_val;
-    TL_TENSOR_DATA_TO(loss->value, 0, loss_val, TL_FLOAT);
+    TOFU_TENSOR_DATA_TO(loss->value, 0, loss_val, TOFU_FLOAT);
 
-    tl_tensor_free(t_pred);
-    tl_tensor_free(t_target);
-    tl_graph_free(g);
+    tofu_tensor_free(t_pred);
+    tofu_tensor_free(t_target);
+    tofu_graph_free(g);
 
     return loss_val;
 }
@@ -1274,22 +1274,22 @@ static void test_gradient_checking_mse_loss() {
     float target_data[] = {1.5f, 2.5f, 2.5f, 3.5f};
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_pred = tl_tensor_create(pred_data, 1, (int[]){len}, TL_FLOAT);
-    tl_tensor* t_target = tl_tensor_create(target_data, 1, (int[]){len}, TL_FLOAT);
+    tofu_tensor* t_pred = tofu_tensor_create(pred_data, 1, (int[]){len}, TOFU_FLOAT);
+    tofu_tensor* t_target = tofu_tensor_create(target_data, 1, (int[]){len}, TOFU_FLOAT);
 
-    tl_graph_node* pred = tl_graph_input(g, t_pred);
-    tl_graph_node* target = tl_graph_input(g, t_target);
+    tofu_graph_node* pred = tofu_graph_input(g, t_pred);
+    tofu_graph_node* target = tofu_graph_input(g, t_target);
     pred->requires_grad = 1;  /* Only pred is trainable */
 
-    tl_graph_node* loss = tl_graph_mse_loss(g, pred, target);
+    tofu_graph_node* loss = tofu_graph_mse_loss(g, pred, target);
 
     /* Loss gradient is 1.0 (scalar loss) */
-    loss->grad = tl_tensor_create_with_values((float[]){1.0f}, 1, (int[]){1});
+    loss->grad = tofu_tensor_create_with_values((float[]){1.0f}, 1, (int[]){1});
 
     /* Backward pass */
-    tl_graph_backward(g, loss);
+    tofu_graph_backward(g, loss);
 
     /* Check gradients for pred */
     printf("  Checking dL/dpred:\n");
@@ -1298,7 +1298,7 @@ static void test_gradient_checking_mse_loss() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(pred->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(pred->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(pred_data, i, len, mse_loss_fn, &ctx);
         float error = relative_error(analytical, numerical);
@@ -1318,9 +1318,9 @@ static void test_gradient_checking_mse_loss() {
 
     assert(num_errors == 0);
 
-    tl_tensor_free(t_pred);
-    tl_tensor_free(t_target);
-    tl_graph_free(g);
+    tofu_tensor_free(t_pred);
+    tofu_tensor_free(t_target);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }
@@ -1340,22 +1340,22 @@ typedef struct {
 static float ce_loss_fn(float* param_data, void* ctx) {
     ce_loss_context* cc = (ce_loss_context*)ctx;
 
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_pred = tl_tensor_create(cc->pred_data, 1, (int[]){cc->len}, TL_FLOAT);
-    tl_tensor* t_target = tl_tensor_create(cc->target_data, 1, (int[]){cc->len}, TL_FLOAT);
+    tofu_tensor* t_pred = tofu_tensor_create(cc->pred_data, 1, (int[]){cc->len}, TOFU_FLOAT);
+    tofu_tensor* t_target = tofu_tensor_create(cc->target_data, 1, (int[]){cc->len}, TOFU_FLOAT);
 
-    tl_graph_node* pred = tl_graph_input(g, t_pred);
-    tl_graph_node* target = tl_graph_input(g, t_target);
-    tl_graph_node* loss = tl_graph_ce_loss(g, pred, target);
+    tofu_graph_node* pred = tofu_graph_input(g, t_pred);
+    tofu_graph_node* target = tofu_graph_input(g, t_target);
+    tofu_graph_node* loss = tofu_graph_ce_loss(g, pred, target);
 
     /* Extract loss value */
     float loss_val;
-    TL_TENSOR_DATA_TO(loss->value, 0, loss_val, TL_FLOAT);
+    TOFU_TENSOR_DATA_TO(loss->value, 0, loss_val, TOFU_FLOAT);
 
-    tl_tensor_free(t_pred);
-    tl_tensor_free(t_target);
-    tl_graph_free(g);
+    tofu_tensor_free(t_pred);
+    tofu_tensor_free(t_target);
+    tofu_graph_free(g);
 
     return loss_val;
 }
@@ -1371,22 +1371,22 @@ static void test_gradient_checking_ce_loss() {
                            1.0f, 0.0f, 0.0f}; /* One-hot for class 0 */
 
     /* Create graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
 
-    tl_tensor* t_pred = tl_tensor_create(pred_data, 1, (int[]){len}, TL_FLOAT);
-    tl_tensor* t_target = tl_tensor_create(target_data, 1, (int[]){len}, TL_FLOAT);
+    tofu_tensor* t_pred = tofu_tensor_create(pred_data, 1, (int[]){len}, TOFU_FLOAT);
+    tofu_tensor* t_target = tofu_tensor_create(target_data, 1, (int[]){len}, TOFU_FLOAT);
 
-    tl_graph_node* pred = tl_graph_input(g, t_pred);
-    tl_graph_node* target = tl_graph_input(g, t_target);
+    tofu_graph_node* pred = tofu_graph_input(g, t_pred);
+    tofu_graph_node* target = tofu_graph_input(g, t_target);
     pred->requires_grad = 1;
 
-    tl_graph_node* loss = tl_graph_ce_loss(g, pred, target);
+    tofu_graph_node* loss = tofu_graph_ce_loss(g, pred, target);
 
     /* Loss gradient is 1.0 */
-    loss->grad = tl_tensor_create_with_values((float[]){1.0f}, 1, (int[]){1});
+    loss->grad = tofu_tensor_create_with_values((float[]){1.0f}, 1, (int[]){1});
 
     /* Backward pass */
-    tl_graph_backward(g, loss);
+    tofu_graph_backward(g, loss);
 
     /* Check gradients for pred */
     printf("  Checking dL/dpred:\n");
@@ -1395,7 +1395,7 @@ static void test_gradient_checking_ce_loss() {
 
     for (int i = 0; i < len; i++) {
         float analytical;
-        TL_TENSOR_DATA_TO(pred->grad, i, analytical, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(pred->grad, i, analytical, TOFU_FLOAT);
 
         float numerical = compute_numerical_gradient(pred_data, i, len, ce_loss_fn, &ctx);
         float error = relative_error(analytical, numerical);
@@ -1422,9 +1422,9 @@ static void test_gradient_checking_ce_loss() {
 
     assert(num_errors == 0);
 
-    tl_tensor_free(t_pred);
-    tl_tensor_free(t_target);
-    tl_graph_free(g);
+    tofu_tensor_free(t_pred);
+    tofu_tensor_free(t_target);
+    tofu_graph_free(g);
 
     printf("  ✓ PASSED\n");
 }

@@ -59,50 +59,50 @@ For each block:
 ## Operations Required
 
 ### Already in Tofu ✅
-1. `tl_tensor_matmul` - Q/K/V projections, FFN
-2. `tl_tensor_transpose` - K^T for attention scores
-3. `tl_tensor_reshape` - Multi-head reshaping
-4. `tl_tensor_elew_broadcast` - Residual connections (add)
-5. `tl_tensor_elew_param` - Scaling (divide by sqrt(d_k))
+1. `tofu_tensor_matmul` - Q/K/V projections, FFN
+2. `tofu_tensor_transpose` - K^T for attention scores
+3. `tofu_tensor_reshape` - Multi-head reshaping
+4. `tofu_tensor_elew_broadcast` - Residual connections (add)
+5. `tofu_tensor_elew_param` - Scaling (divide by sqrt(d_k))
 
 ### Need to Add - Forward Pass 🔨
 1. **Softmax** (have in examples, need in library)
-   - `tl_tensor_softmax(src, dst, axis)` - Apply along axis
+   - `tofu_tensor_softmax(src, dst, axis)` - Apply along axis
 
 2. **Reduction Operations**
-   - `tl_tensor_sum(src, dst, axis)` - Sum along axis
-   - `tl_tensor_mean(src, dst, axis)` - Mean along axis
+   - `tofu_tensor_sum(src, dst, axis)` - Sum along axis
+   - `tofu_tensor_mean(src, dst, axis)` - Mean along axis
 
 3. **Layer Normalization**
-   - `tl_tensor_layer_norm(src, dst, gamma, beta, eps)` - Normalize + scale/shift
+   - `tofu_tensor_layer_norm(src, dst, gamma, beta, eps)` - Normalize + scale/shift
 
 ### Need to Add - Backward Pass 🔨
 1. **Softmax Gradient**
-   - `tl_tensor_softmax_backward(grad_out, softmax_out, grad_in, axis)`
+   - `tofu_tensor_softmax_backward(grad_out, softmax_out, grad_in, axis)`
 
 2. **Layer Norm Gradient**
-   - `tl_tensor_layer_norm_backward(grad_out, x, gamma, grad_in, grad_gamma, grad_beta)`
+   - `tofu_tensor_layer_norm_backward(grad_out, x, gamma, grad_in, grad_gamma, grad_beta)`
 
 3. **Loss Functions**
-   - `tl_tensor_cross_entropy(logits, labels, loss)` - Forward
-   - `tl_tensor_cross_entropy_backward(logits, labels, grad)` - Backward
+   - `tofu_tensor_cross_entropy(logits, labels, loss)` - Forward
+   - `tofu_tensor_cross_entropy_backward(logits, labels, grad)` - Backward
 
 4. **Optimizer**
-   - `tl_optimizer_sgd(params[], grads[], lr, momentum)`
-   - Or: `tl_optimizer_adam(params[], grads[], lr, beta1, beta2, eps)`
+   - `tofu_optimizer_sgd(params[], grads[], lr, momentum)`
+   - Or: `tofu_optimizer_adam(params[], grads[], lr, beta1, beta2, eps)`
 
 ### Nice to Have (Can Implement in User Code)
-- Argmax (can use `tl_tensor_maxreduce` with arg output)
+- Argmax (can use `tofu_tensor_maxreduce` with arg output)
 - Gradient clipping
 - Learning rate scheduling
 
 ## Implementation Plan
 
 ### Phase 1: Add Missing Operations
-1. Add `tl_tensor_softmax` to library
-2. Add `tl_tensor_sum` reduction
-3. Add `tl_tensor_mean` reduction
-4. Add `tl_tensor_layer_norm` (or implement with existing ops)
+1. Add `tofu_tensor_softmax` to library
+2. Add `tofu_tensor_sum` reduction
+3. Add `tofu_tensor_mean` reduction
+4. Add `tofu_tensor_layer_norm` (or implement with existing ops)
 
 ### Phase 2: Add Backward Pass Operations
 1. Implement gradient computation for all forward ops

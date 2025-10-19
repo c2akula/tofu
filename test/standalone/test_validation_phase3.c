@@ -27,9 +27,9 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
-#include "tl_graph.h"
-#include "tl_tensor.h"
-#include "tl_optimizer.h"
+#include "tofu_graph.h"
+#include "tofu_tensor.h"
+#include "tofu_optimizer.h"
 
 #define NUM_CLASSES 3
 #define NUM_SAMPLES_PER_CLASS 10
@@ -233,34 +233,34 @@ static void test_multi_class_classification() {
     printf("Network initialized with Xavier weights and zero biases\n\n");
 
     /* Create computation graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     assert(g != NULL);
 
     /* Create parameter tensors */
-    tl_tensor* t_W1 = tl_tensor_create(W1_data, 2, (int[]){INPUT_DIM, HIDDEN_DIM}, TL_FLOAT);
-    tl_tensor* t_b1 = tl_tensor_create(b1_data, 1, (int[]){HIDDEN_DIM}, TL_FLOAT);
-    tl_tensor* t_W2 = tl_tensor_create(W2_data, 2, (int[]){HIDDEN_DIM, OUTPUT_DIM}, TL_FLOAT);
-    tl_tensor* t_b2 = tl_tensor_create(b2_data, 1, (int[]){OUTPUT_DIM}, TL_FLOAT);
+    tofu_tensor* t_W1 = tofu_tensor_create(W1_data, 2, (int[]){INPUT_DIM, HIDDEN_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_b1 = tofu_tensor_create(b1_data, 1, (int[]){HIDDEN_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_W2 = tofu_tensor_create(W2_data, 2, (int[]){HIDDEN_DIM, OUTPUT_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_b2 = tofu_tensor_create(b2_data, 1, (int[]){OUTPUT_DIM}, TOFU_FLOAT);
 
     assert(t_W1 && t_b1 && t_W2 && t_b2);
 
     /* Create trainable parameters */
-    tl_graph_node* p_W1 = tl_graph_param(g, t_W1);
-    tl_graph_node* p_b1 = tl_graph_param(g, t_b1);
-    tl_graph_node* p_W2 = tl_graph_param(g, t_W2);
-    tl_graph_node* p_b2 = tl_graph_param(g, t_b2);
+    tofu_graph_node* p_W1 = tofu_graph_param(g, t_W1);
+    tofu_graph_node* p_b1 = tofu_graph_param(g, t_b1);
+    tofu_graph_node* p_W2 = tofu_graph_param(g, t_W2);
+    tofu_graph_node* p_b2 = tofu_graph_param(g, t_b2);
 
     assert(p_W1 && p_b1 && p_W2 && p_b2);
 
     /* Create optimizer */
-    tl_optimizer* opt = tl_optimizer_sgd_create(g, LEARNING_RATE);
+    tofu_optimizer* opt = tofu_optimizer_sgd_create(g, LEARNING_RATE);
     assert(opt != NULL);
 
     /* Manually add parameters to optimizer */
-    tl_optimizer_add_param(opt, p_W1);
-    tl_optimizer_add_param(opt, p_b1);
-    tl_optimizer_add_param(opt, p_W2);
-    tl_optimizer_add_param(opt, p_b2);
+    tofu_optimizer_add_param(opt, p_W1);
+    tofu_optimizer_add_param(opt, p_b1);
+    tofu_optimizer_add_param(opt, p_W2);
+    tofu_optimizer_add_param(opt, p_b2);
 
     printf("Starting training...\n");
     printf("Epoch | Loss      | Train Accuracy\n");
@@ -278,40 +278,40 @@ static void test_multi_class_classification() {
         /* Iterate over all samples */
         for (int sample_idx = 0; sample_idx < NUM_SAMPLES; sample_idx++) {
             /* Clear the graph for new forward pass */
-            tl_graph_clear_ops(g);
+            tofu_graph_clear_ops(g);
 
             /* Get single sample and label */
             float* x_sample = &X[sample_idx * INPUT_DIM];
             float* y_sample = &Y[sample_idx * OUTPUT_DIM];
 
             /* Create input tensor: reshape to (1, 2) */
-            tl_tensor* t_x = tl_tensor_create(x_sample, 1, (int[]){INPUT_DIM}, TL_FLOAT);
-            tl_tensor* t_y = tl_tensor_create(y_sample, 1, (int[]){OUTPUT_DIM}, TL_FLOAT);
+            tofu_tensor* t_x = tofu_tensor_create(x_sample, 1, (int[]){INPUT_DIM}, TOFU_FLOAT);
+            tofu_tensor* t_y = tofu_tensor_create(y_sample, 1, (int[]){OUTPUT_DIM}, TOFU_FLOAT);
 
             assert(t_x && t_y);
 
             /* Create input nodes */
-            tl_graph_node* x = tl_graph_input(g, t_x);
-            tl_graph_node* y_true = tl_graph_input(g, t_y);
+            tofu_graph_node* x = tofu_graph_input(g, t_x);
+            tofu_graph_node* y_true = tofu_graph_input(g, t_y);
 
             /* Forward pass: h = relu(x @ W1 + b1) */
-            tl_graph_node* xW1 = tl_graph_matmul(g, x, p_W1);
-            tl_graph_node* xW1_b1 = tl_graph_add(g, xW1, p_b1);
-            tl_graph_node* h = tl_graph_relu(g, xW1_b1);
+            tofu_graph_node* xW1 = tofu_graph_matmul(g, x, p_W1);
+            tofu_graph_node* xW1_b1 = tofu_graph_add(g, xW1, p_b1);
+            tofu_graph_node* h = tofu_graph_relu(g, xW1_b1);
 
             /* Output: logits = h @ W2 + b2 */
-            tl_graph_node* hW2 = tl_graph_matmul(g, h, p_W2);
-            tl_graph_node* logits = tl_graph_add(g, hW2, p_b2);
+            tofu_graph_node* hW2 = tofu_graph_matmul(g, h, p_W2);
+            tofu_graph_node* logits = tofu_graph_add(g, hW2, p_b2);
 
             /* Apply softmax for probabilities */
-            tl_graph_node* probs = tl_graph_softmax(g, logits, 0);
+            tofu_graph_node* probs = tofu_graph_softmax(g, logits, 0);
 
             /* Compute cross-entropy loss */
-            tl_graph_node* loss_node = tl_graph_ce_loss(g, probs, y_true);
+            tofu_graph_node* loss_node = tofu_graph_ce_loss(g, probs, y_true);
 
             /* Extract loss value */
             float loss_val = 0.0f;
-            TL_TENSOR_DATA_TO(loss_node->value, 0, loss_val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(loss_node->value, 0, loss_val, TOFU_FLOAT);
 
             epoch_loss += loss_val;
 
@@ -325,15 +325,15 @@ static void test_multi_class_classification() {
             }
 
             /* Backward pass */
-            tl_graph_zero_grad(g);
-            tl_graph_backward(g, loss_node);
+            tofu_graph_zero_grad(g);
+            tofu_graph_backward(g, loss_node);
 
             /* Optimizer step */
-            tl_optimizer_step(opt);
+            tofu_optimizer_step(opt);
 
             /* Cleanup for this iteration */
-            tl_tensor_free(t_x);
-            tl_tensor_free(t_y);
+            tofu_tensor_free(t_x);
+            tofu_tensor_free(t_y);
         }
 
         /* Print training progress */
@@ -370,25 +370,25 @@ static void test_multi_class_classification() {
     int class_total[NUM_CLASSES] = {0};
 
     for (int sample_idx = 0; sample_idx < NUM_SAMPLES; sample_idx++) {
-        tl_graph_clear_ops(g);
+        tofu_graph_clear_ops(g);
 
         float* x_sample = &X[sample_idx * INPUT_DIM];
         float* y_sample = &Y[sample_idx * OUTPUT_DIM];
 
-        tl_tensor* t_x = tl_tensor_create(x_sample, 1, (int[]){INPUT_DIM}, TL_FLOAT);
-        tl_tensor* t_y = tl_tensor_create(y_sample, 1, (int[]){OUTPUT_DIM}, TL_FLOAT);
+        tofu_tensor* t_x = tofu_tensor_create(x_sample, 1, (int[]){INPUT_DIM}, TOFU_FLOAT);
+        tofu_tensor* t_y = tofu_tensor_create(y_sample, 1, (int[]){OUTPUT_DIM}, TOFU_FLOAT);
 
-        tl_graph_node* x = tl_graph_input(g, t_x);
-        tl_graph_node* y_true = tl_graph_input(g, t_y);
+        tofu_graph_node* x = tofu_graph_input(g, t_x);
+        tofu_graph_node* y_true = tofu_graph_input(g, t_y);
 
         /* Forward pass: h = relu(x @ W1 + b1) */
-        tl_graph_node* xW1 = tl_graph_matmul(g, x, p_W1);
-        tl_graph_node* xW1_b1 = tl_graph_add(g, xW1, p_b1);
-        tl_graph_node* h = tl_graph_relu(g, xW1_b1);
+        tofu_graph_node* xW1 = tofu_graph_matmul(g, x, p_W1);
+        tofu_graph_node* xW1_b1 = tofu_graph_add(g, xW1, p_b1);
+        tofu_graph_node* h = tofu_graph_relu(g, xW1_b1);
 
         /* Output: logits = h @ W2 + b2 */
-        tl_graph_node* hW2 = tl_graph_matmul(g, h, p_W2);
-        tl_graph_node* logits = tl_graph_add(g, hW2, p_b2);
+        tofu_graph_node* hW2 = tofu_graph_matmul(g, h, p_W2);
+        tofu_graph_node* logits = tofu_graph_add(g, hW2, p_b2);
 
         float* logits_data = (float*)logits->value->data;
         int pred_class = get_predicted_class(logits_data, OUTPUT_DIM);
@@ -401,8 +401,8 @@ static void test_multi_class_classification() {
             class_correct[true_class]++;
         }
 
-        tl_tensor_free(t_x);
-        tl_tensor_free(t_y);
+        tofu_tensor_free(t_x);
+        tofu_tensor_free(t_y);
     }
 
     float final_accuracy = (float)final_correct / NUM_SAMPLES;
@@ -427,12 +427,12 @@ static void test_multi_class_classification() {
     }
 
     /* Cleanup */
-    tl_graph_free(g);
-    tl_tensor_free(t_W1);
-    tl_tensor_free(t_b1);
-    tl_tensor_free(t_W2);
-    tl_tensor_free(t_b2);
-    tl_optimizer_free(opt);
+    tofu_graph_free(g);
+    tofu_tensor_free(t_W1);
+    tofu_tensor_free(t_b1);
+    tofu_tensor_free(t_W2);
+    tofu_tensor_free(t_b2);
+    tofu_optimizer_free(opt);
 
     free(X);
     free(Y);
@@ -500,40 +500,40 @@ static void test_regression_sine() {
     printf("Network initialized with Xavier weights and zero biases\n\n");
 
     /* Create computation graph */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     assert(g != NULL);
 
     /* Create parameter tensors */
-    tl_tensor* t_W1 = tl_tensor_create(W1_data, 2, (int[]){REGRESSION_INPUT_DIM, REGRESSION_HIDDEN_DIM}, TL_FLOAT);
-    tl_tensor* t_b1 = tl_tensor_create(b1_data, 1, (int[]){REGRESSION_HIDDEN_DIM}, TL_FLOAT);
-    tl_tensor* t_W2 = tl_tensor_create(W2_data, 2, (int[]){REGRESSION_HIDDEN_DIM, REGRESSION_HIDDEN_DIM}, TL_FLOAT);
-    tl_tensor* t_b2 = tl_tensor_create(b2_data, 1, (int[]){REGRESSION_HIDDEN_DIM}, TL_FLOAT);
-    tl_tensor* t_W3 = tl_tensor_create(W3_data, 2, (int[]){REGRESSION_HIDDEN_DIM, REGRESSION_OUTPUT_DIM}, TL_FLOAT);
-    tl_tensor* t_b3 = tl_tensor_create(b3_data, 1, (int[]){REGRESSION_OUTPUT_DIM}, TL_FLOAT);
+    tofu_tensor* t_W1 = tofu_tensor_create(W1_data, 2, (int[]){REGRESSION_INPUT_DIM, REGRESSION_HIDDEN_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_b1 = tofu_tensor_create(b1_data, 1, (int[]){REGRESSION_HIDDEN_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_W2 = tofu_tensor_create(W2_data, 2, (int[]){REGRESSION_HIDDEN_DIM, REGRESSION_HIDDEN_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_b2 = tofu_tensor_create(b2_data, 1, (int[]){REGRESSION_HIDDEN_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_W3 = tofu_tensor_create(W3_data, 2, (int[]){REGRESSION_HIDDEN_DIM, REGRESSION_OUTPUT_DIM}, TOFU_FLOAT);
+    tofu_tensor* t_b3 = tofu_tensor_create(b3_data, 1, (int[]){REGRESSION_OUTPUT_DIM}, TOFU_FLOAT);
 
     assert(t_W1 && t_b1 && t_W2 && t_b2 && t_W3 && t_b3);
 
     /* Create trainable parameters */
-    tl_graph_node* p_W1 = tl_graph_param(g, t_W1);
-    tl_graph_node* p_b1 = tl_graph_param(g, t_b1);
-    tl_graph_node* p_W2 = tl_graph_param(g, t_W2);
-    tl_graph_node* p_b2 = tl_graph_param(g, t_b2);
-    tl_graph_node* p_W3 = tl_graph_param(g, t_W3);
-    tl_graph_node* p_b3 = tl_graph_param(g, t_b3);
+    tofu_graph_node* p_W1 = tofu_graph_param(g, t_W1);
+    tofu_graph_node* p_b1 = tofu_graph_param(g, t_b1);
+    tofu_graph_node* p_W2 = tofu_graph_param(g, t_W2);
+    tofu_graph_node* p_b2 = tofu_graph_param(g, t_b2);
+    tofu_graph_node* p_W3 = tofu_graph_param(g, t_W3);
+    tofu_graph_node* p_b3 = tofu_graph_param(g, t_b3);
 
     assert(p_W1 && p_b1 && p_W2 && p_b2 && p_W3 && p_b3);
 
     /* Create optimizer */
-    tl_optimizer* opt = tl_optimizer_sgd_create(g, REGRESSION_LEARNING_RATE);
+    tofu_optimizer* opt = tofu_optimizer_sgd_create(g, REGRESSION_LEARNING_RATE);
     assert(opt != NULL);
 
     /* Manually add parameters to optimizer */
-    tl_optimizer_add_param(opt, p_W1);
-    tl_optimizer_add_param(opt, p_b1);
-    tl_optimizer_add_param(opt, p_W2);
-    tl_optimizer_add_param(opt, p_b2);
-    tl_optimizer_add_param(opt, p_W3);
-    tl_optimizer_add_param(opt, p_b3);
+    tofu_optimizer_add_param(opt, p_W1);
+    tofu_optimizer_add_param(opt, p_b1);
+    tofu_optimizer_add_param(opt, p_W2);
+    tofu_optimizer_add_param(opt, p_b2);
+    tofu_optimizer_add_param(opt, p_W3);
+    tofu_optimizer_add_param(opt, p_b3);
 
     printf("Starting training...\n");
     printf("Epoch | MSE Loss\n");
@@ -549,55 +549,55 @@ static void test_regression_sine() {
         /* Iterate over all samples */
         for (int sample_idx = 0; sample_idx < REGRESSION_NUM_SAMPLES; sample_idx++) {
             /* Clear the graph for new forward pass */
-            tl_graph_clear_ops(g);
+            tofu_graph_clear_ops(g);
 
             /* Get single sample and label */
             float* x_sample = &X[sample_idx * REGRESSION_INPUT_DIM];
             float* y_sample = &Y[sample_idx * REGRESSION_OUTPUT_DIM];
 
             /* Create input tensor: reshape to (1,) */
-            tl_tensor* t_x = tl_tensor_create(x_sample, 1, (int[]){REGRESSION_INPUT_DIM}, TL_FLOAT);
-            tl_tensor* t_y = tl_tensor_create(y_sample, 1, (int[]){REGRESSION_OUTPUT_DIM}, TL_FLOAT);
+            tofu_tensor* t_x = tofu_tensor_create(x_sample, 1, (int[]){REGRESSION_INPUT_DIM}, TOFU_FLOAT);
+            tofu_tensor* t_y = tofu_tensor_create(y_sample, 1, (int[]){REGRESSION_OUTPUT_DIM}, TOFU_FLOAT);
 
             assert(t_x && t_y);
 
             /* Create input nodes */
-            tl_graph_node* x = tl_graph_input(g, t_x);
-            tl_graph_node* y_true = tl_graph_input(g, t_y);
+            tofu_graph_node* x = tofu_graph_input(g, t_x);
+            tofu_graph_node* y_true = tofu_graph_input(g, t_y);
 
             /* Forward pass: h1 = relu(x @ W1 + b1) */
-            tl_graph_node* xW1 = tl_graph_matmul(g, x, p_W1);
-            tl_graph_node* xW1_b1 = tl_graph_add(g, xW1, p_b1);
-            tl_graph_node* h1 = tl_graph_relu(g, xW1_b1);
+            tofu_graph_node* xW1 = tofu_graph_matmul(g, x, p_W1);
+            tofu_graph_node* xW1_b1 = tofu_graph_add(g, xW1, p_b1);
+            tofu_graph_node* h1 = tofu_graph_relu(g, xW1_b1);
 
             /* h2 = relu(h1 @ W2 + b2) */
-            tl_graph_node* h1W2 = tl_graph_matmul(g, h1, p_W2);
-            tl_graph_node* h1W2_b2 = tl_graph_add(g, h1W2, p_b2);
-            tl_graph_node* h2 = tl_graph_relu(g, h1W2_b2);
+            tofu_graph_node* h1W2 = tofu_graph_matmul(g, h1, p_W2);
+            tofu_graph_node* h1W2_b2 = tofu_graph_add(g, h1W2, p_b2);
+            tofu_graph_node* h2 = tofu_graph_relu(g, h1W2_b2);
 
             /* Output (linear, no activation): pred = h2 @ W3 + b3 */
-            tl_graph_node* h2W3 = tl_graph_matmul(g, h2, p_W3);
-            tl_graph_node* pred = tl_graph_add(g, h2W3, p_b3);
+            tofu_graph_node* h2W3 = tofu_graph_matmul(g, h2, p_W3);
+            tofu_graph_node* pred = tofu_graph_add(g, h2W3, p_b3);
 
             /* Compute MSE loss */
-            tl_graph_node* loss_node = tl_graph_mse_loss(g, pred, y_true);
+            tofu_graph_node* loss_node = tofu_graph_mse_loss(g, pred, y_true);
 
             /* Extract loss value */
             float loss_val = 0.0f;
-            TL_TENSOR_DATA_TO(loss_node->value, 0, loss_val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(loss_node->value, 0, loss_val, TOFU_FLOAT);
 
             epoch_loss += loss_val;
 
             /* Backward pass */
-            tl_graph_zero_grad(g);
-            tl_graph_backward(g, loss_node);
+            tofu_graph_zero_grad(g);
+            tofu_graph_backward(g, loss_node);
 
             /* Optimizer step */
-            tl_optimizer_step(opt);
+            tofu_optimizer_step(opt);
 
             /* Cleanup for this iteration */
-            tl_tensor_free(t_x);
-            tl_tensor_free(t_y);
+            tofu_tensor_free(t_x);
+            tofu_tensor_free(t_y);
         }
 
         /* Print training progress */
@@ -630,37 +630,37 @@ static void test_regression_sine() {
     float total_error = 0.0f;
 
     for (int i = 0; i < num_eval_points; i++) {
-        tl_graph_clear_ops(g);
+        tofu_graph_clear_ops(g);
 
         float x_val = eval_points[i];
         float y_true_val = sinf(x_val);
 
-        tl_tensor* t_x = tl_tensor_create(&x_val, 1, (int[]){REGRESSION_INPUT_DIM}, TL_FLOAT);
+        tofu_tensor* t_x = tofu_tensor_create(&x_val, 1, (int[]){REGRESSION_INPUT_DIM}, TOFU_FLOAT);
         assert(t_x);
 
-        tl_graph_node* x = tl_graph_input(g, t_x);
+        tofu_graph_node* x = tofu_graph_input(g, t_x);
 
         /* Forward pass through 3-layer network */
-        tl_graph_node* xW1 = tl_graph_matmul(g, x, p_W1);
-        tl_graph_node* xW1_b1 = tl_graph_add(g, xW1, p_b1);
-        tl_graph_node* h1 = tl_graph_relu(g, xW1_b1);
+        tofu_graph_node* xW1 = tofu_graph_matmul(g, x, p_W1);
+        tofu_graph_node* xW1_b1 = tofu_graph_add(g, xW1, p_b1);
+        tofu_graph_node* h1 = tofu_graph_relu(g, xW1_b1);
 
-        tl_graph_node* h1W2 = tl_graph_matmul(g, h1, p_W2);
-        tl_graph_node* h1W2_b2 = tl_graph_add(g, h1W2, p_b2);
-        tl_graph_node* h2 = tl_graph_relu(g, h1W2_b2);
+        tofu_graph_node* h1W2 = tofu_graph_matmul(g, h1, p_W2);
+        tofu_graph_node* h1W2_b2 = tofu_graph_add(g, h1W2, p_b2);
+        tofu_graph_node* h2 = tofu_graph_relu(g, h1W2_b2);
 
-        tl_graph_node* h2W3 = tl_graph_matmul(g, h2, p_W3);
-        tl_graph_node* pred = tl_graph_add(g, h2W3, p_b3);
+        tofu_graph_node* h2W3 = tofu_graph_matmul(g, h2, p_W3);
+        tofu_graph_node* pred = tofu_graph_add(g, h2W3, p_b3);
 
         float pred_val = 0.0f;
-        TL_TENSOR_DATA_TO(pred->value, 0, pred_val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(pred->value, 0, pred_val, TOFU_FLOAT);
 
         float error = fabsf(pred_val - y_true_val);
         total_error += error;
 
         printf("  x=%.4f: pred=%.4f, actual=%.4f, error=%.4f\n", x_val, pred_val, y_true_val, error);
 
-        tl_tensor_free(t_x);
+        tofu_tensor_free(t_x);
     }
 
     float avg_error = total_error / num_eval_points;
@@ -680,14 +680,14 @@ static void test_regression_sine() {
     }
 
     /* Cleanup */
-    tl_graph_free(g);
-    tl_tensor_free(t_W1);
-    tl_tensor_free(t_b1);
-    tl_tensor_free(t_W2);
-    tl_tensor_free(t_b2);
-    tl_tensor_free(t_W3);
-    tl_tensor_free(t_b3);
-    tl_optimizer_free(opt);
+    tofu_graph_free(g);
+    tofu_tensor_free(t_W1);
+    tofu_tensor_free(t_b1);
+    tofu_tensor_free(t_W2);
+    tofu_tensor_free(t_b2);
+    tofu_tensor_free(t_W3);
+    tofu_tensor_free(t_b3);
+    tofu_optimizer_free(opt);
 
     free(X);
     free(Y);

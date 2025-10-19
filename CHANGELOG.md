@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - API stabilization for v1.0.0
 
-### Changed
+### Changed - BREAKING
+- **API Rename**: Changed all API prefixes from `tl_`/`TL_` to `tofu_`/`TOFU_` (Milestone 4: API Stabilization)
+  - All functions: `tl_tensor_create` → `tofu_tensor_create`, `tl_graph_create` → `tofu_graph_create`, etc.
+  - All types: `tl_tensor` → `tofu_tensor`, `tl_dtype` → `tofu_dtype`, etc.
+  - All macros: `TL_FLOAT` → `TOFU_FLOAT`, `TL_MAXDIM` → `TOFU_MAXDIM`, etc.
+  - All header files: `tl_tensor.h` → `tofu_tensor.h`, `tl_graph.h` → `tofu_graph.h`, etc.
+  - Migration: Use find-and-replace to update your code (`tl_` → `tofu_`, `TL_` → `TOFU_`)
 - Updated LICENSE to reflect dual copyright (original TensorLight + Tofu modifications)
 - Added CONTRIBUTORS.md documenting project history and contributions
 - Added Acknowledgments section to README

@@ -50,15 +50,15 @@ A v1.0.0 release signals:
 ### 1. Core Operations ✅ COMPLETE
 
 **Implemented Gradients** (Milestone 1):
-- ✅ Element-wise multiply gradient (TL_OP_MUL backward)
-- ✅ Layer normalization gradient (TL_OP_LAYER_NORM backward)
-- ✅ MSE loss gradient (TL_OP_MSE_LOSS backward)
-- ✅ Cross-entropy loss gradient (TL_OP_CE_LOSS backward)
-- ✅ Transpose gradient (TL_OP_TRANSPOSE backward)
+- ✅ Element-wise multiply gradient (TOFU_OP_MUL backward)
+- ✅ Layer normalization gradient (TOFU_OP_LAYER_NORM backward)
+- ✅ MSE loss gradient (TOFU_OP_MSE_LOSS backward)
+- ✅ Cross-entropy loss gradient (TOFU_OP_CE_LOSS backward)
+- ✅ Transpose gradient (TOFU_OP_TRANSPOSE backward)
 
 **Not Implemented** (operations not yet added to framework):
-- ⏳ Mean reduction gradient (TL_OP_MEAN) - operation not in use
-- ⏳ Sum reduction gradient (TL_OP_SUM) - operation not in use
+- ⏳ Mean reduction gradient (TOFU_OP_MEAN) - operation not in use
+- ⏳ Sum reduction gradient (TOFU_OP_SUM) - operation not in use
 
 **Status**: All essential operations complete. MEAN/SUM deferred (not needed for current use cases).
 
@@ -469,8 +469,8 @@ A v1.0.0 release signals:
 ## Next Immediate Steps (This Week)
 
 1. **Implement missing operation gradients** (Days 1-2)
-   - TL_OP_MUL backward
-   - TL_OP_LAYER_NORM backward
+   - TOFU_OP_MUL backward
+   - TOFU_OP_LAYER_NORM backward
    - Add gradient checking tests
 
 2. **Start Phase 3 validation** (Days 3-4)
@@ -492,7 +492,7 @@ A v1.0.0 release signals:
 
 1. **Threading Model**: Is Tofu thread-safe? Document this clearly.
 2. **Error Handling**: Assert vs return codes? Need consistent strategy.
-3. **API Naming**: Any last changes? (e.g., tl_graph_* vs tl_*)
+3. **API Naming**: Any last changes? (e.g., tofu_graph_* vs tofu_*)
 4. **Supported Platforms**: Officially support Linux + macOS only? Or Windows too?
 5. **Minimum C Standard**: C99? C11? Document requirement.
 6. **Memory Ownership**: Who owns tensors? Document lifecycle clearly.

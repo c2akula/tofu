@@ -1,0 +1,1597 @@
+/*
+ * Copyright (c) 2018-2020 Zhixu Zhao
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#include "test_tofu.h"
+#include "lightnettest/ln_test.h"
+#include "tofu_tensor.h"
+#include "tofu_util.h"
+#include "tofu_check.h"
+#include "tofu_type.h"
+
+#define ARR(type, varg...) (type[]){varg}
+
+static void checked_setup(void)
+{
+}
+
+static void checked_teardown(void)
+{
+}
+
+LN_TEST_START(test_tofu_tensor_create)
+{
+     tofu_tensor *t;
+     int dims[3] = {1, 2, 3};
+     int32_t data[6] = {1, 2, 3, 4, 5, 6};
+     int i;
+
+     t = tofu_tensor_create(NULL, 3, (int[]){1, 2, 3}, TOFU_DOUBLE);
+     ck_assert_int_eq(t->ndim, 3);
+     ck_assert_int_eq(t->dtype, TOFU_DOUBLE);
+     ck_assert_int_eq(t->len, 6);
+     for (i = 0; i < t->ndim; i++)
+          ck_assert(t->dims[i] == dims[i]);
+     ck_assert_ptr_eq(t->data, NULL);
+     tofu_tensor_free_data_too(t);
+
+     t = tofu_tensor_create(NULL, 3, dims, TOFU_FLOAT);
+     ck_assert_int_eq(t->ndim, 3);
+     ck_assert_int_eq(t->dtype, TOFU_FLOAT);
+     ck_assert_int_eq(t->len, 6);
+     for (i = 0; i < t->ndim; i++)
+          ck_assert(t->dims[i] == dims[i]);
+     ck_assert_ptr_eq(t->data, NULL);
+     tofu_tensor_free_data_too(t);
+
+     t = tofu_tensor_create(data, 3, dims, TOFU_INT32);
+     ck_assert_int_eq(t->ndim, 3);
+     ck_assert_int_eq(t->dtype, TOFU_INT32);
+     ck_assert_int_eq(t->len, 6);
+     for (i = 0; i < t->ndim; i++)
+          ck_assert(t->dims[i] == dims[i]);
+     for (i = 0; i < t->len; i++)
+          ck_assert(((int32_t *)t->data)[i] == data[i]);
+     tofu_tensor_free(t);
+
+     t = tofu_tensor_create(data, 3, dims, TOFU_INT32);
+     ck_assert_int_eq(t->ndim, 3);
+     ck_assert_int_eq(t->dtype, TOFU_INT32);
+     ck_assert_int_eq(t->len, 6);
+     for (i = 0; i < t->ndim; i++)
+          ck_assert(t->dims[i] == dims[i]);
+     for (i = 0; i < t->len; i++)
+          ck_assert(((int32_t *)t->data)[i] == data[i]);
+     tofu_tensor_free(t);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_free)
+{
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_clone)
+{
+     tofu_tensor *t1, *t2;
+     int dims[3] = {1, 2, 3};
+     int32_t data[6] = {1, 2, 3, 4, 5, 6};
+     int i;
+
+     t1 = tofu_tensor_create(data, 3, dims, TOFU_INT32);
+     t2 = tofu_tensor_clone(t1);
+     ck_assert_int_eq(t2->ndim, 3);
+     ck_assert_int_eq(t2->dtype, TOFU_INT32);
+     ck_assert_int_eq(t2->len, 6);
+     for (i = 0; i < t2->ndim; i++)
+          ck_assert(t2->dims[i] == dims[i]);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((int32_t *)t2->data)[i] == data[i]);
+     tofu_tensor_free(t1);
+     tofu_tensor_free_data_too(t2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_repeat)
+{
+     int dims[] = {2, 3};
+     float data[] = {1, 2, 3, 4, 5, 6};
+     int dims1[] = {1, 2, 3};
+     float data1[] = {1, 2, 3, 4, 5, 6};
+     int dims2[] = {2, 2, 3};
+     float data2[] = {1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6};
+     int dims3[] = {3, 2, 3};
+     float data3[] = {1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6};
+     tofu_tensor *t, *t1, *t2, *t3;
+
+     t = tofu_tensor_create(data, 2, dims, TOFU_FLOAT);
+
+     t1 = tofu_tensor_repeat(t, 1);
+     ck_assert_array_int_eq(t1->dims, dims1, 3);
+     ck_assert_array_float_eq_tol((float*)t1->data, data1, t1->len, 0);
+     tofu_tensor_free_data_too(t1);
+
+     t2 = tofu_tensor_repeat(t, 2);
+     ck_assert_array_int_eq(t2->dims, dims2, 3);
+     ck_assert_array_float_eq_tol((float*)t2->data, data2, t2->len, 0);
+     tofu_tensor_free_data_too(t2);
+
+     t3 = tofu_tensor_repeat(t, 3);
+     ck_assert_array_int_eq(t3->dims, dims3, 3);
+     ck_assert_array_float_eq_tol((float*)t3->data, data3, t3->len, 0);
+     tofu_tensor_free_data_too(t3);
+
+     tofu_tensor_free(t);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_arange)
+{
+     tofu_tensor *dst, *t;
+
+     t = tofu_tensor_create(ARR(int16_t,0,1,2), 1, ARR(int,3), TOFU_INT16);
+     dst = tofu_tensor_arange(0, 3, 1, TOFU_INT16);
+     tofu_assert_tensor_eq(dst, t);
+     tofu_tensor_free(t);
+     tofu_tensor_free_data_too(dst);
+
+     t = tofu_tensor_create(ARR(float,0.1,1.6,3.1), 1, ARR(int,3), TOFU_FLOAT);
+     dst = tofu_tensor_arange(0.1, 3.2, 1.5, TOFU_FLOAT);
+     tofu_assert_tensor_eq(dst, t);
+     tofu_tensor_free(t);
+     tofu_tensor_free_data_too(dst);
+
+     t = tofu_tensor_create(ARR(float,0.1,1.6), 1, ARR(int,2), TOFU_FLOAT);
+     dst = tofu_tensor_arange(0.1, 3.1, 1.5, TOFU_FLOAT);
+     tofu_assert_tensor_eq(dst, t);
+     tofu_tensor_free(t);
+     tofu_tensor_free_data_too(dst);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_rearange)
+{
+     tofu_tensor *src, *t;
+
+     t = tofu_tensor_create(ARR(int16_t,0,1,2), 1, ARR(int,3), TOFU_INT16);
+     src = tofu_tensor_zeros(1, ARR(int, 3), TOFU_INT16);
+     tofu_tensor_rearange(src, 0, 3, 1);
+     tofu_assert_tensor_eq(src, t);
+     tofu_tensor_free(t);
+     tofu_tensor_free_data_too(src);
+
+     t = tofu_tensor_create(ARR(float,0.1,1.6,3.1), 1, ARR(int,3), TOFU_FLOAT);
+     src = tofu_tensor_zeros(1, ARR(int, 3), TOFU_FLOAT);
+     tofu_tensor_rearange(src, 0.1, 3.2, 1.5);
+     tofu_assert_tensor_eq(src, t);
+     tofu_tensor_free(t);
+     tofu_tensor_free_data_too(src);
+
+     t = tofu_tensor_create(ARR(float,0.1,1.6), 1, ARR(int,2), TOFU_FLOAT);
+     src = tofu_tensor_zeros(1, ARR(int, 2), TOFU_FLOAT);
+     tofu_tensor_rearange(src, 0.1, 3.1, 1.5);
+     tofu_assert_tensor_eq(src, t);
+     tofu_tensor_free(t);
+     tofu_tensor_free_data_too(src);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_issameshape)
+{
+     tofu_tensor *t1;
+     tofu_tensor *t2;
+
+     t1 = tofu_tensor_zeros(2, (int[]){3, 3}, TOFU_FLOAT);
+     t2 = tofu_tensor_zeros(2, (int[]){3, 3}, TOFU_FLOAT);
+     ck_assert_int_eq(tofu_tensor_issameshape(t1, t2), 1);
+     tofu_tensor_free_data_too(t1);
+     tofu_tensor_free_data_too(t2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_fprint)
+{
+     tofu_tensor *t;
+     FILE *fp;
+     char s[BUFSIZ];
+
+     t = tofu_tensor_zeros(3, (int[]){1, 2, 3}, TOFU_FLOAT);
+
+     fp = tmpfile();
+     ck_assert_ptr_ne(fp, NULL);
+     tofu_tensor_fprint(fp, t, NULL);
+     rewind(fp);
+     ck_assert_ptr_ne(fgets(s, 100, fp), NULL);
+     ck_assert_ptr_ne(fgets(s+strlen(s), 100, fp), NULL);
+     ck_assert_str_eq(s, "[[[0.000 0.000 0.000]\n"
+                         "  [0.000 0.000 0.000]]]\n");
+     fclose(fp);
+
+     fp = tmpfile();
+     ck_assert_ptr_ne(fp, NULL);
+     tofu_tensor_fprint(fp, t, "%.4f");
+     rewind(fp);
+     ck_assert_ptr_ne(fgets(s, 100, fp), NULL);
+     ck_assert_ptr_ne(fgets(s+strlen(s), 100, fp), NULL);
+     ck_assert_str_eq(s, "[[[0.0000 0.0000 0.0000]\n"
+                         "  [0.0000 0.0000 0.0000]]]\n");
+     fclose(fp);
+
+     tofu_tensor_free_data_too(t);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_print)
+{
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_save)
+{
+     tofu_tensor *t;
+     FILE *fp;
+     char s[BUFSIZ];
+
+     t = tofu_tensor_zeros(3, (int[]){1, 2, 3}, TOFU_FLOAT);
+
+     tofu_tensor_save("__test_tensor_save_tmp", t, NULL);
+     fp = fopen("__test_tensor_save_tmp", "r");
+     ck_assert_ptr_ne(fp, NULL);
+     ck_assert_ptr_ne(fgets(s, 100, fp), NULL);
+     ck_assert_ptr_ne(fgets(s+strlen(s), 100, fp), NULL);
+     ck_assert_str_eq(s, "[[[0.000 0.000 0.000]\n"
+                         "  [0.000 0.000 0.000]]]\n");
+     fclose(fp);
+     ck_assert_int_eq(remove("__test_tensor_save_tmp"), 0);
+
+     /* ck_assert_int_lt(tofu_tensor_save("__non_exist_dir/tmp", t, NULL), 0); */
+     tofu_tensor_free_data_too(t);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_zeros_slice)
+{
+     tofu_tensor *t1, *t2;
+     int i;
+
+     t1 = tofu_tensor_zeros(1, (int[]){1}, TOFU_INT8);
+     t2 = tofu_tensor_zeros_slice(t1, 0, 1, TOFU_INT8);
+     ck_assert_int_eq(t2->ndim, 1);
+     ck_assert_int_eq(t2->dtype, TOFU_INT8);
+     ck_assert_int_eq(t2->len, 1);
+     ck_assert(t2->dims[0] == 1);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((int8_t *)t2->data)[i] == 0);
+
+     tofu_tensor_free_data_too(t1);
+     tofu_tensor_free_data_too(t2);
+
+     t1 = tofu_tensor_zeros(3, (int[]){1, 2, 3}, TOFU_INT16);
+     t2 = tofu_tensor_zeros_slice(t1, 2, 2, TOFU_UINT8);
+     ck_assert_int_eq(t2->ndim, 3);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT8);
+     ck_assert_int_eq(t2->len, 4);
+     ck_assert(t2->dims[0] == 1);
+     ck_assert(t2->dims[1] == 2);
+     ck_assert(t2->dims[2] == 2);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((uint8_t *)t2->data)[i] == 0);
+     tofu_tensor_free_data_too(t1);
+     tofu_tensor_free_data_too(t2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_slice)
+{
+     tofu_tensor *t1, *t2;
+     int ndim = 3;
+     int dims[3] = {1, 2, 3};
+     uint16_t data[6] = {1, 2, 3, 4, 5, 6};
+     uint16_t data_slice1[4] = {2, 3, 5, 6};
+     uint16_t data_slice2[3] = {1, 2, 3};
+     int i;
+
+     t1 = tofu_tensor_create(data, ndim, dims, TOFU_UINT16);
+     t2 = tofu_tensor_slice(t1, NULL, 2, 1, 2);
+     ck_assert_int_eq(t2->ndim, 3);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT16);
+     ck_assert_int_eq(t2->len, 4);
+     ck_assert(t2->dims[0] == 1);
+     ck_assert(t2->dims[1] == 2);
+     ck_assert(t2->dims[2] == 2);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((uint16_t *)t2->data)[i] == data_slice1[i]);
+     tofu_tensor_free(t1);
+     tofu_tensor_free_data_too(t2);
+
+     t1 = tofu_tensor_create(data, ndim, dims, TOFU_UINT16);
+     t2 = tofu_tensor_zeros_slice(t1, 1, 1, TOFU_UINT16);
+     t2 = tofu_tensor_slice(t1, t2, 1, 0, 1);
+     ck_assert_int_eq(t2->ndim, 3);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT16);
+     ck_assert_int_eq(t2->len, 3);
+     ck_assert(t2->dims[0] == 1);
+     ck_assert(t2->dims[1] == 1);
+     ck_assert(t2->dims[2] == 3);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((uint16_t *)t2->data)[i] == data_slice2[i]);
+     tofu_tensor_free(t1);
+     tofu_tensor_free_data_too(t2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_slice_nocopy)
+{
+     tofu_tensor *t1, *t2;
+     int ndim = 2;
+     int dims[] = {3, 2};
+     uint16_t data[6] = {1, 2, 3, 4, 5, 6};
+     uint16_t data_slice1[] = {1, 2, 3, 4};
+     uint16_t data_slice2[] = {3, 4, 5, 6};
+     int i;
+
+     t1 = tofu_tensor_create(data, ndim, dims, TOFU_UINT16);
+     t2 = tofu_tensor_slice_nocopy(t1, NULL, 0, 0, 2);
+     ck_assert_int_eq(t2->ndim, 2);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT16);
+     ck_assert_int_eq(t2->len, 4);
+     ck_assert(t2->dims[0] == 2);
+     ck_assert(t2->dims[1] == 2);
+     ck_assert(t2->owner == t1);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((uint16_t *)t2->data)[i] == data_slice1[i]);
+     tofu_tensor_free(t1);
+     tofu_tensor_free(t2);
+
+     t1 = tofu_tensor_create(data, ndim, dims, TOFU_UINT16);
+     t2 = tofu_tensor_create_slice(NULL, t1, 0, 2, TOFU_UINT16);
+     t2 = tofu_tensor_slice_nocopy(t1, t2, 0, 1, 2);
+     ck_assert_int_eq(t2->ndim, 2);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT16);
+     ck_assert_int_eq(t2->len, 4);
+     ck_assert(t2->dims[0] == 2);
+     ck_assert(t2->dims[1] == 2);
+     ck_assert(t2->owner == t1);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((uint16_t *)t2->data)[i] == data_slice2[i]);
+     tofu_tensor_free(t1);
+     tofu_tensor_free(t2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_concat)
+{
+     tofu_tensor *t, *t1, *t2, *t3, *t4, *t5, *t6;
+     int ndim = 3;
+     int dims[] = {2, 2, 3};
+     uint16_t data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+     int dims1[] = {1, 2, 3};
+     uint16_t data_slice1[] = {1, 2, 3, 4, 5, 6};
+     int dims2[] = {1, 2, 3};
+     uint16_t data_slice2[] = {7, 8, 9, 10, 11, 12};
+     int dims3[] = {2, 1, 3};
+     uint16_t data_slice3[] = {1, 2, 3, 7, 8, 9};
+     int dims4[] = {2, 1, 3};
+     uint16_t data_slice4[] = {4, 5, 6, 10, 11, 12};
+     int dims5[] = {2, 2, 1};
+     uint16_t data_slice5[] = {1, 4, 7, 10};
+     int dims6[] = {2, 2, 2};
+     uint16_t data_slice6[] = {2, 3, 5, 6, 8, 9, 11, 12};
+
+     t = tofu_tensor_zeros(ndim, dims, TOFU_UINT16);
+     t1 = tofu_tensor_create(data_slice1, ndim, dims1, TOFU_UINT16);
+     t2 = tofu_tensor_create(data_slice2, ndim, dims2, TOFU_UINT16);
+     tofu_tensor_concat(t1, t2, t, 0);
+     ck_assert_array_uint_eq((uint16_t*)t->data, data, t->len);
+     tofu_tensor_free_data_too(t);
+     tofu_tensor_free(t1);
+     tofu_tensor_free(t2);
+
+     t = tofu_tensor_zeros(ndim, dims, TOFU_UINT16);
+     t3 = tofu_tensor_create(data_slice3, ndim, dims3, TOFU_UINT16);
+     t4 = tofu_tensor_create(data_slice4, ndim, dims4, TOFU_UINT16);
+     tofu_tensor_concat(t3, t4, t, 1);
+     ck_assert_array_uint_eq((uint16_t*)t->data, data, t->len);
+     tofu_tensor_free_data_too(t);
+     tofu_tensor_free(t3);
+     tofu_tensor_free(t4);
+
+     t5 = tofu_tensor_create(data_slice5, ndim, dims5, TOFU_UINT16);
+     t6 = tofu_tensor_create(data_slice6, ndim, dims6, TOFU_UINT16);
+     t = tofu_tensor_concat(t5, t6, NULL, 2);
+     ck_assert_array_uint_eq((uint16_t*)t->data, data, t->len);
+     tofu_tensor_free_data_too(t);
+     tofu_tensor_free(t5);
+     tofu_tensor_free(t6);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_reshape)
+{
+     tofu_tensor *t1, *t2;
+     int dims1[3] = {1, 2, 3};
+     int dims2[2] = {1, 6};
+     int data[6] = {1, 2, 3, 4, 5, 6};
+     int i;
+
+     t1 = tofu_tensor_create(data, 3, dims1, TOFU_UINT32);
+     t2 = tofu_tensor_reshape(t1, 2, dims2);
+     ck_assert_int_eq(t2->ndim, 2);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT32);
+     ck_assert_int_eq(t2->len, 6);
+     ck_assert(t2->dims[0] == 1);
+     ck_assert(t2->dims[1] == 6);
+     for (i = 0; i < t2->len; i++)
+          ck_assert(((uint32_t *)t2->data)[i] == data[i]);
+     tofu_tensor_free(t1);
+     tofu_tensor_free(t2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_maxreduce)
+{
+     tofu_tensor *src, *dst, *arg;
+     int dims[3] = {2, 3, 2};
+     int32_t data[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+     int dst_data1[4] = {5, 6, 11, 12};
+     int dst_data2[6] = {7, 8, 9, 10, 11, 12};
+     int dst_data3[6] = {2, 4, 6, 8, 10, 12};
+     int arg_data[6] = {1, 1, 1, 1, 1, 1};
+     int i;
+
+     src = tofu_tensor_create(data, 3, dims, TOFU_INT32);
+     dst = tofu_tensor_maxreduce(src, NULL, NULL, 1);
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dtype, TOFU_INT32);
+     ck_assert_int_eq(dst->len, 4);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 1);
+     ck_assert(dst->dims[2] == 2);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int32_t *)dst->data)[i] == dst_data1[i]);
+     tofu_tensor_free_data_too(dst);
+
+     dst = tofu_tensor_zeros_slice(src, 0, 1, TOFU_INT32);
+     dst = tofu_tensor_maxreduce(src, dst, NULL, 0);
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dtype, TOFU_INT32);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert(dst->dims[0] == 1);
+     ck_assert(dst->dims[1] == 3);
+     ck_assert(dst->dims[2] == 2);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int32_t *)dst->data)[i] == dst_data2[i]);
+     tofu_tensor_free_data_too(dst);
+
+     dst = tofu_tensor_zeros_slice(src, 2, 1, TOFU_INT32);
+     arg = tofu_tensor_zeros_slice(src, 2, 1, TOFU_INT32);
+     dst = tofu_tensor_maxreduce(src, dst, arg, 2);
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dtype, TOFU_INT32);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 3);
+     ck_assert(dst->dims[2] == 1);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int32_t *)dst->data)[i] == dst_data3[i]);
+     ck_assert_int_eq(arg->ndim, 3);
+     ck_assert_int_eq(arg->dtype, TOFU_INT32);
+     ck_assert_int_eq(arg->len, 6);
+     ck_assert(arg->dims[0] == 2);
+     ck_assert(arg->dims[1] == 3);
+     ck_assert(arg->dims[2] == 1);
+     for (i = 0; i < arg->len; i++)
+          ck_assert(((int32_t *)arg->data)[i] == arg_data[i]);
+     tofu_tensor_free_data_too(dst);
+     tofu_tensor_free_data_too(arg);
+
+     tofu_tensor_free(src);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_elew)
+{
+     tofu_tensor *src1, *src2, *dst;
+     int8_t src1_data[6] = {1, 1, 2, 2, 3, 3};
+     int8_t src2_data[6] = {1, 2, 3, 4, 5, 6};
+     int8_t dst_data[6] = {1, 2, 6, 8, 15, 18};
+     int dims[2] = {2, 3};
+     int i;
+
+     src1 = tofu_tensor_create(src1_data, 2, dims, TOFU_INT8);
+     src2 = tofu_tensor_create(src2_data, 2, dims, TOFU_INT8);
+     dst = tofu_tensor_elew(src1, src2, NULL, TOFU_MUL);
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dtype, TOFU_INT8);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 3);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int8_t *)dst->data)[i] == dst_data[i]);
+     tofu_tensor_free_data_too(dst);
+
+     src1 = tofu_tensor_create(src1_data, 2, dims, TOFU_INT8);
+     src2 = tofu_tensor_create(src2_data, 2, dims, TOFU_INT8);
+     dst = tofu_tensor_zeros(2, dims, TOFU_INT8);
+     dst = tofu_tensor_elew(src1, src2, dst, TOFU_MUL);
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dtype, TOFU_INT8);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 3);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int8_t *)dst->data)[i] == dst_data[i]);
+     tofu_tensor_free_data_too(dst);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_elew_param)
+{
+     tofu_tensor *src, *dst;
+     int8_t src_data[6] = {1, 1, 2, 2, 3, 3};
+     double param = 2;
+     int8_t dst_data[6] = {2, 2, 4, 4, 6, 6};
+     int dims[2] = {2, 3};
+     int i;
+
+     src = tofu_tensor_create(src_data, 2, dims, TOFU_INT8);
+     dst = tofu_tensor_elew_param(src, param, NULL, TOFU_MUL);
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dtype, TOFU_INT8);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 3);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int8_t *)dst->data)[i] == dst_data[i]);
+     tofu_tensor_free_data_too(dst);
+
+     src = tofu_tensor_create(src_data, 2, dims, TOFU_INT8);
+     dst = tofu_tensor_zeros(2, dims, TOFU_INT8);
+     dst = tofu_tensor_elew_param(src, param, dst, TOFU_MUL);
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dtype, TOFU_INT8);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 3);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int8_t *)dst->data)[i] == dst_data[i]);
+     tofu_tensor_free_data_too(dst);
+
+     tofu_tensor_free(src);
+}
+LN_TEST_END
+
+/* Replaced by test_tofu_tensor_inner */
+
+LN_TEST_START(test_tofu_tensor_inner)
+{
+     tofu_tensor *src1, *src2, *dst;
+
+     /* Test case 1: 1-D vectors -> scalar (special case)
+      * [3] x [3] -> scalar
+      * [1, 2, 3] · [4, 5, 6] = 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
+      */
+     int32_t vec1_data[3] = {1, 2, 3};
+     int32_t vec2_data[3] = {4, 5, 6};
+     int32_t scalar_result[1] = {32};
+
+     src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+     src2 = tofu_tensor_create(vec2_data, 1, ARR(int, 3), TOFU_INT32);
+     dst = tofu_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 1);
+     ck_assert_int_eq(dst->dims[0], 1);
+     ck_assert_int_eq(dst->len, 1);
+     ck_assert_int_eq(dst->dtype, TOFU_INT32);
+     ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+
+     /* Test case 2: 2-D same shape [2,3] x [2,3] -> [2,2]
+      * NumPy-compatible inner product for [2,3] x [2,3]:
+      * Output shape: [2,2] (cartesian product over non-last dimensions)
+      * result[i,j] = inner_product(src1[i,:], src2[j,:])
+      * result[0,0] = 1*1 + 1*2 + 2*3 = 9
+      * result[0,1] = 1*4 + 1*5 + 2*6 = 21
+      * result[1,0] = 2*1 + 3*2 + 3*3 = 17
+      * result[1,1] = 2*4 + 3*5 + 3*6 = 41
+      */
+     int8_t src1_data[6] = {1, 1, 2, 2, 3, 3};
+     int8_t src2_data[6] = {1, 2, 3, 4, 5, 6};
+     int8_t result_2x2[4] = {9, 21, 17, 41};
+
+     src1 = tofu_tensor_create(src1_data, 2, ARR(int, 2, 3), TOFU_INT8);
+     src2 = tofu_tensor_create(src2_data, 2, ARR(int, 2, 3), TOFU_INT8);
+     dst = tofu_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 2);
+     ck_assert_int_eq(dst->len, 4);
+     ck_assert_int_eq(dst->dtype, TOFU_INT8);
+     ck_assert_array_int_eq((int8_t*)dst->data, result_2x2, dst->len);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+
+     /* Test case 3: 2-D different shapes [2,4] x [3,4] -> [2,3]
+      * src1 = [[1,2,3,4], [5,6,7,8]]  shape [2,4]
+      * src2 = [[1,1,1,1], [2,2,2,2], [3,3,3,3]]  shape [3,4]
+      * result[0,0] = 1*1 + 2*1 + 3*1 + 4*1 = 10
+      * result[0,1] = 1*2 + 2*2 + 3*2 + 4*2 = 20
+      * result[0,2] = 1*3 + 2*3 + 3*3 + 4*3 = 30
+      * result[1,0] = 5*1 + 6*1 + 7*1 + 8*1 = 26
+      * result[1,1] = 5*2 + 6*2 + 7*2 + 8*2 = 52
+      * result[1,2] = 5*3 + 6*3 + 7*3 + 8*3 = 78
+      */
+     int16_t arr1_data[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+     int16_t arr2_data[12] = {1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
+     int16_t result_2x3[6] = {10, 20, 30, 26, 52, 78};
+
+     src1 = tofu_tensor_create(arr1_data, 2, ARR(int, 2, 4), TOFU_INT16);
+     src2 = tofu_tensor_create(arr2_data, 2, ARR(int, 3, 4), TOFU_INT16);
+     dst = tofu_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 3);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert_int_eq(dst->dtype, TOFU_INT16);
+     ck_assert_array_int_eq((int16_t*)dst->data, result_2x3, dst->len);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+
+     /* Test case 4: 3-D arrays [2,2,3] x [2,2,3] -> [2,2,2,2]
+      * Testing the full N-D case with cartesian product
+      * src1 has shape [2,2,3], src2 has shape [2,2,3]
+      * Output should have shape [2,2] + [2,2] = [2,2,2,2]
+      */
+     float tensor3d_1[12] = {1, 1, 1,  2, 2, 2,  3, 3, 3,  4, 4, 4};
+     float tensor3d_2[12] = {1, 2, 3,  1, 2, 3,  1, 2, 3,  1, 2, 3};
+     // For simplicity, just verify shape and a few sample values
+
+     src1 = tofu_tensor_create(tensor3d_1, 3, ARR(int, 2, 2, 3), TOFU_FLOAT);
+     src2 = tofu_tensor_create(tensor3d_2, 3, ARR(int, 2, 2, 3), TOFU_FLOAT);
+     dst = tofu_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 4);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 2);
+     ck_assert_int_eq(dst->dims[2], 2);
+     ck_assert_int_eq(dst->dims[3], 2);
+     ck_assert_int_eq(dst->len, 16);
+     ck_assert_int_eq(dst->dtype, TOFU_FLOAT);
+
+     // Verify a few specific values
+     // result[0,0,0,0] = (1,1,1)·(1,2,3) = 1*1 + 1*2 + 1*3 = 6
+     ck_assert(((float*)dst->data)[0] == 6.0f);
+     // result[0,0,1,0] = (1,1,1)·(1,2,3) = 6 (same vector)
+     ck_assert(((float*)dst->data)[2] == 6.0f);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+
+     /* Test case 5: Mixed dimensions [2,3,4] x [5,4] -> [2,3,5]
+      * 3-D tensor with 2-D tensor
+      * src1.shape[:-1] = [2,3], src2.shape[:-1] = [5]
+      * Output shape = [2,3] + [5] = [2,3,5]
+      */
+     float mixed_3d[24];  // 2*3*4 = 24
+     float mixed_2d[20];  // 5*4 = 20
+     for (int i = 0; i < 24; i++) mixed_3d[i] = (float)(i + 1);
+     for (int i = 0; i < 20; i++) mixed_2d[i] = 1.0f;
+
+     src1 = tofu_tensor_create(mixed_3d, 3, ARR(int, 2, 3, 4), TOFU_FLOAT);
+     src2 = tofu_tensor_create(mixed_2d, 2, ARR(int, 5, 4), TOFU_FLOAT);
+     dst = tofu_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 3);
+     ck_assert_int_eq(dst->dims[2], 5);
+     ck_assert_int_eq(dst->len, 30);
+     ck_assert_int_eq(dst->dtype, TOFU_FLOAT);
+
+     // Verify first value: (1,2,3,4)·(1,1,1,1) = 10
+     ck_assert(((float*)dst->data)[0] == 10.0f);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+
+     /* Test case 6: Edge case - single element last dimension [2,1] x [3,1] -> [2,3]
+      * Each "vector" has length 1
+      */
+     int32_t single_1[2] = {5, 10};
+     int32_t single_2[3] = {2, 3, 4};
+     int32_t result_single[6] = {10, 15, 20, 20, 30, 40};  // outer product essentially
+
+     src1 = tofu_tensor_create(single_1, 2, ARR(int, 2, 1), TOFU_INT32);
+     src2 = tofu_tensor_create(single_2, 2, ARR(int, 3, 1), TOFU_INT32);
+     dst = tofu_tensor_inner(src1, src2, NULL);
+
+     ck_assert_int_eq(dst->ndim, 2);
+     ck_assert_int_eq(dst->dims[0], 2);
+     ck_assert_int_eq(dst->dims[1], 3);
+     ck_assert_int_eq(dst->len, 6);
+     ck_assert_array_int_eq((int32_t*)dst->data, result_single, dst->len);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+
+     /* Test case 7: Pre-allocated destination tensor */
+     src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+     src2 = tofu_tensor_create(vec2_data, 1, ARR(int, 3), TOFU_INT32);
+     dst = tofu_tensor_zeros(1, ARR(int, 1), TOFU_INT32);
+     dst = tofu_tensor_inner(src1, src2, dst);
+
+     ck_assert_int_eq(dst->ndim, 1);
+     ck_assert_int_eq(dst->dims[0], 1);
+     ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+     tofu_tensor_free(src1);
+     tofu_tensor_free(src2);
+     tofu_tensor_free_data_too(dst);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_transpose)
+{
+     tofu_tensor *src, *dst;
+     int dims1[3] = {2, 3, 2};
+     int dims2[3] = {3, 2, 2};
+     uint8_t data[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+     int axes1[3] = {0, 2, 1};
+     uint8_t dst_data1[12] = {1, 3, 5, 2, 4, 6, 7, 9, 11, 8, 10, 12};
+     int axes2[3] = {1, 2, 0};
+     uint8_t dst_data2[12] = {1, 7, 2, 8, 3, 9, 4, 10, 5, 11, 6, 12};
+     int i;
+
+     src = tofu_tensor_create(data, 3, dims1, TOFU_UINT8);
+
+     dst = tofu_tensor_transpose(src, NULL, axes1);
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dtype, TOFU_UINT8);
+     ck_assert_int_eq(dst->len, 12);
+     ck_assert(dst->dims[0] == 2);
+     ck_assert(dst->dims[1] == 2);
+     ck_assert(dst->dims[2] == 3);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int8_t *)dst->data)[i] == dst_data1[i]);
+     tofu_tensor_free_data_too(dst);
+
+     dst = tofu_tensor_zeros(3, dims2, TOFU_UINT8);
+     dst = tofu_tensor_transpose(src, dst, axes2);
+     ck_assert_int_eq(dst->ndim, 3);
+     ck_assert_int_eq(dst->dtype, TOFU_UINT8);
+     ck_assert_int_eq(dst->len, 12);
+     ck_assert(dst->dims[0] == 3);
+     ck_assert(dst->dims[1] == 2);
+     ck_assert(dst->dims[2] == 2);
+     for (i = 0; i < dst->len; i++)
+          ck_assert(((int8_t *)dst->data)[i] == dst_data2[i]);
+     tofu_tensor_free_data_too(dst);
+
+     tofu_tensor_free(src);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_lrelu)
+{
+    float data_f[5] = {-1, 0, 1, 255, -256};
+    float data_lrelu_f[5] = {-0.1, 0, 1, 255, -25.6};
+    float negslope = 0.1;
+    tofu_tensor *t1, *t2;
+
+    t1 = tofu_tensor_create(data_f, 1, (int[]){5}, TOFU_FLOAT);
+    t2 = tofu_tensor_lrelu(t1, NULL, negslope);
+    ck_assert(tofu_tensor_issameshape(t1, t2));
+    ck_assert(t1->dtype == t2->dtype);
+    ck_assert_array_float_eq_tol((float *)t2->data, data_lrelu_f, t2->len, 0);
+    tofu_tensor_free_data_too(t2);
+
+    t2 = tofu_tensor_zeros(1, (int[]){5}, TOFU_FLOAT);
+    t2 = tofu_tensor_lrelu(t1, t2, negslope);
+    ck_assert_array_float_eq_tol((float *)t2->data, data_lrelu_f, t2->len, 0);
+    tofu_tensor_free_data_too(t2);
+
+    tofu_tensor_free(t1);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_convert)
+{
+     float data_f[5] = {-1, 0, 1, 255, 256};
+     uint8_t data_ui8[5] = {0, 0, 1, 255, 255};
+     tofu_tensor *t1, *t2;
+
+     t1 = tofu_tensor_create(data_f, 1, (int[]){5}, TOFU_FLOAT);
+
+     t2 = tofu_tensor_convert(t1, NULL, TOFU_UINT8);
+     ck_assert_int_eq(t2->ndim, 1);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT8);
+     ck_assert_int_eq(t2->len, t1->len);
+     ck_assert(t2->dims[0] == t1->dims[0]);
+     for (int i = 0; i < 5; i++)
+          ck_assert_uint_eq(((uint8_t*)t2->data)[i], data_ui8[i]);
+     tofu_tensor_free_data_too(t2);
+
+     t2 = tofu_tensor_zeros(1, (int[]){5}, TOFU_UINT8);
+     t2 = tofu_tensor_convert(t1, t2, TOFU_UINT8);
+     ck_assert_int_eq(t2->ndim, 1);
+     ck_assert_int_eq(t2->dtype, TOFU_UINT8);
+     ck_assert_int_eq(t2->len, t1->len);
+     ck_assert(t2->dims[0] == t1->dims[0]);
+     for (int i = 0; i < 5; i++)
+          ck_assert_uint_eq(((uint8_t*)t2->data)[i], data_ui8[i]);
+     tofu_tensor_free_data_too(t2);
+
+     tofu_tensor_free(t1);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_resize)
+{
+     float src_data[] = {1, 2, 3, 4};
+     float true_data[] = {1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 4, 4};
+     float dst_data[16];
+     tofu_tensor *src, *dst, *true_tensor;
+
+     true_tensor = tofu_tensor_create(true_data, 2, ARR(int,4,4), TOFU_FLOAT);
+     src = tofu_tensor_create(src_data, 2, ARR(int,2,2), TOFU_FLOAT);
+     dst = tofu_tensor_resize(src, NULL, ARR(int,4,4), TOFU_NEAREST);
+     tofu_assert_tensor_eq(dst, true_tensor);
+     tofu_tensor_free_data_too(dst);
+
+     dst = tofu_tensor_create(dst_data, 2, ARR(int,4,4), TOFU_FLOAT);
+     dst = tofu_tensor_resize(src, dst, ARR(int,4,4), TOFU_NEAREST);
+     tofu_assert_tensor_eq(dst, true_tensor);
+     tofu_tensor_free(dst);
+
+     tofu_tensor_free(src);
+     tofu_tensor_free(true_tensor);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_submean)
+{
+    uint8_t src_data[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    float dst_data[12];
+    float true_data[] = {0, 3, 6, 9, 0, 3, 6, 9, 0, 3, 6, 9};
+    double mean[] = {1, 2, 3};
+    tofu_tensor *src, *dst, *true_tensor;
+
+    true_tensor = tofu_tensor_create(true_data, 3, ARR(int,3,2,2), TOFU_FLOAT);
+    src = tofu_tensor_create(src_data, 3, ARR(int,2,2,3), TOFU_UINT8);
+    dst = tofu_tensor_submean(src, NULL, mean);
+    ck_assert_int_eq(dst->dtype, TOFU_FLOAT);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_array_int_eq(dst->dims, ARR(int,3,2,2), 3);
+    tofu_assert_tensor_eq(dst, true_tensor);
+    tofu_tensor_free_data_too(dst);
+
+    dst = tofu_tensor_create(dst_data, 3, ARR(int,3,2,2), TOFU_FLOAT);
+    tofu_tensor_submean(src, dst, mean);
+    tofu_assert_tensor_eq(dst, true_tensor);
+    tofu_tensor_free(dst);
+
+    tofu_tensor_free(src);
+    tofu_tensor_free(true_tensor);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_isbroadcastable)
+{
+    tofu_tensor *t1, *t2, *t3, *t4, *t5;
+    
+    // Same shape tensors should be broadcastable
+    t1 = tofu_tensor_zeros(2, (int[]){3, 3}, TOFU_FLOAT);
+    t2 = tofu_tensor_zeros(2, (int[]){3, 3}, TOFU_FLOAT);
+    ck_assert_int_eq(tofu_tensor_isbroadcastable(t1, t2), 1);
+    
+    // Scalar to array broadcasting
+    t3 = tofu_tensor_zeros(1, (int[]){1}, TOFU_FLOAT);
+    ck_assert_int_eq(tofu_tensor_isbroadcastable(t3, t1), 1);
+    ck_assert_int_eq(tofu_tensor_isbroadcastable(t1, t3), 1);
+    
+    // Broadcasting along a dimension
+    t4 = tofu_tensor_zeros(2, (int[]){1, 3}, TOFU_FLOAT);
+    ck_assert_int_eq(tofu_tensor_isbroadcastable(t4, t1), 1);
+    ck_assert_int_eq(tofu_tensor_isbroadcastable(t1, t4), 1);
+    
+    // Non-broadcastable dimensions
+    t5 = tofu_tensor_zeros(2, (int[]){2, 4}, TOFU_FLOAT);
+    ck_assert_int_eq(tofu_tensor_isbroadcastable(t5, t1), 0);
+    
+    tofu_tensor_free_data_too(t1);
+    tofu_tensor_free_data_too(t2);
+    tofu_tensor_free_data_too(t3);
+    tofu_tensor_free_data_too(t4);
+    tofu_tensor_free_data_too(t5);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_broadcast_to)
+{
+    tofu_tensor *src, *dst, *expected;
+    float src_data[] = {1, 2, 3};
+    float expected_data[] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
+    
+    // Create a 1D tensor with shape [3]
+    src = tofu_tensor_create(src_data, 1, (int[]){3}, TOFU_FLOAT);
+    
+    // Broadcast to shape [4, 3]
+    dst = tofu_tensor_broadcast_to(src, NULL, 2, (int[]){4, 3});
+    
+    // Create expected tensor
+    expected = tofu_tensor_create(expected_data, 2, (int[]){4, 3}, TOFU_FLOAT);
+    
+    // Verify results
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 4);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 12);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test with a scalar (1x1 tensor)
+    float scalar_val = 5.0f;
+    src = tofu_tensor_create(&scalar_val, 1, (int[]){1}, TOFU_FLOAT);
+    
+    // Broadcast scalar to 2x3 tensor
+    float scalar_expected[] = {5.0f, 5.0f, 5.0f, 5.0f, 5.0f, 5.0f};
+    dst = tofu_tensor_broadcast_to(src, NULL, 2, (int[]){2, 3});
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, scalar_expected, dst->len, 0);
+    
+    tofu_tensor_free(src);
+    tofu_tensor_free_data_too(dst);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_elew_broadcast)
+{
+    tofu_tensor *src1, *src2, *dst, *expected;
+    
+    // Test case 1: Scalar * Matrix
+    float scalar_val = 2.0f;
+    float matrix_data[] = {1, 2, 3, 4, 5, 6};
+    float expected_data[] = {2, 4, 6, 8, 10, 12};
+    
+    src1 = tofu_tensor_create(&scalar_val, 1, (int[]){1}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(matrix_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew_broadcast(src1, src2, NULL, TOFU_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 2: Row + Matrix (broadcasting row across all rows)
+    float row_data[] = {10, 20, 30};
+    float matrix2_data[] = {1, 2, 3, 4, 5, 6};
+    float expected2_data[] = {11, 22, 33, 14, 25, 36};
+    
+    src1 = tofu_tensor_create(row_data, 1, (int[]){3}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(matrix2_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected2_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew_broadcast(src1, src2, NULL, TOFU_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected2_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 3: Column + Matrix (broadcasting column across all columns)
+    float col_data[] = {10, 20};
+    float matrix3_data[] = {1, 2, 3, 4, 5, 6};
+    float expected3_data[] = {11, 12, 13, 24, 25, 26};
+    
+    src1 = tofu_tensor_create(col_data, 2, (int[]){2, 1}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(matrix3_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected3_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew_broadcast(src1, src2, NULL, TOFU_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected3_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 4: 3D broadcasting
+    float tensor3d_small[] = {1, 2};
+    float tensor3d_large[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float expected3d_data[] = {2, 4, 4, 6, 6, 8, 8, 10};
+    
+    src1 = tofu_tensor_create(tensor3d_small, 1, (int[]){2}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(tensor3d_large, 3, (int[]){2, 2, 2}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected3d_data, 3, (int[]){2, 2, 2}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew_broadcast(src1, src2, NULL, TOFU_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 2);
+    ck_assert_int_eq(dst->dims[2], 2);
+    ck_assert_int_eq(dst->len, 8);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected3d_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_elew_with_broadcasting)
+{
+    tofu_tensor *src1, *src2, *dst, *expected;
+    
+    // Test case 1: Use standard elew with broadcastable tensors
+    float scalar_val = 3.0f;
+    float matrix_data[] = {1, 2, 3, 4, 5, 6};
+    float expected_data[] = {3, 6, 9, 12, 15, 18};
+    
+    src1 = tofu_tensor_create(&scalar_val, 1, (int[]){1}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(matrix_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    // Using standard elew that should now use broadcasting internally
+    dst = tofu_tensor_elew(src1, src2, NULL, TOFU_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 2: Row-wise broadcasting with standard elew
+    float row_data[] = {10, 20, 30};
+    float matrix2_data[] = {1, 2, 3, 4, 5, 6};
+    float expected2_data[] = {10, 40, 90, 40, 100, 180};
+    
+    src1 = tofu_tensor_create(row_data, 1, (int[]){3}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(matrix2_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected2_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew(src1, src2, NULL, TOFU_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected2_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_elew_param_with_broadcasting)
+{
+    tofu_tensor *src, *dst, *expected;
+    double param = 5.0;
+    
+    // Test with a matrix - should use broadcasting internally
+    float matrix_data[] = {1, 2, 3, 4, 5, 6};
+    float expected_data[] = {5, 10, 15, 20, 25, 30};
+    
+    src = tofu_tensor_create(matrix_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected_data, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew_param(src, param, NULL, TOFU_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->len, 6);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test with 3D tensor
+    float tensor3d_data[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float expected3d_data[] = {6, 7, 8, 9, 10, 11, 12, 13};
+    
+    src = tofu_tensor_create(tensor3d_data, 3, (int[]){2, 2, 2}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected3d_data, 3, (int[]){2, 2, 2}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew_param(src, param, NULL, TOFU_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 2);
+    ck_assert_int_eq(dst->dims[2], 2);
+    ck_assert_int_eq(dst->len, 8);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected3d_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_broadcasting_edge_cases)
+{
+    tofu_tensor *src1, *src2, *dst, *expected;
+    
+    // Test case 1: Empty dimensions (1-sized dimensions)
+    // Create a 3x1x2 tensor
+    float tensor3d_data[] = {1, 2, 3, 4, 5, 6};
+    // Create a 1x4x1 tensor
+    float tensor3d_data2[] = {10, 20, 30, 40};
+    // Expected result is 3x4x2 tensor
+    float expected_data[] = {
+        11, 12, 21, 22, 31, 32, 41, 42,  // First "sheet" (3D slice)
+        13, 14, 23, 24, 33, 34, 43, 44,  // Second sheet
+        15, 16, 25, 26, 35, 36, 45, 46   // Third sheet
+    };
+    
+    src1 = tofu_tensor_create(tensor3d_data, 3, (int[]){3, 1, 2}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(tensor3d_data2, 3, (int[]){1, 4, 1}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected_data, 3, (int[]){3, 4, 2}, TOFU_FLOAT);
+    
+    dst = tofu_tensor_elew(src1, src2, NULL, TOFU_SUM);
+    
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 4);
+    ck_assert_int_eq(dst->dims[2], 2);
+    ck_assert_int_eq(dst->len, 24);
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_data, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 2: Scalar broadcasting to different data types
+    int8_t scalar_val_i8 = 2;
+    int8_t int8_data[] = {1, 2, 3, 4};
+    int8_t expected_i8_data[] = {2, 4, 6, 8};
+    
+    src1 = tofu_tensor_create(&scalar_val_i8, 1, (int[]){1}, TOFU_INT8);
+    src2 = tofu_tensor_create(int8_data, 1, (int[]){4}, TOFU_INT8);
+    expected = tofu_tensor_create(expected_i8_data, 1, (int[]){4}, TOFU_INT8);
+    
+    dst = tofu_tensor_elew(src1, src2, NULL, TOFU_MUL);
+    
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 4);
+    ck_assert_int_eq(dst->len, 4);
+    ck_assert_int_eq(dst->dtype, TOFU_INT8);
+    ck_assert_array_int_eq((int8_t *)dst->data, expected_i8_data, dst->len);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 3: Broadcasting with a pre-allocated destination tensor
+    float src1_data[] = {1, 2, 3};
+    float src2_data[] = {10, 20};
+    // Expected result is a 2x3 tensor
+    float expected_result[] = {11, 12, 13, 21, 22, 23};
+    
+    src1 = tofu_tensor_create(src1_data, 2, (int[]){1, 3}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(src2_data, 2, (int[]){2, 1}, TOFU_FLOAT);
+    expected = tofu_tensor_create(expected_result, 2, (int[]){2, 3}, TOFU_FLOAT);
+    
+    // Pre-allocate the destination tensor with the correct shape
+    dst = tofu_tensor_zeros(2, (int[]){2, 3}, TOFU_FLOAT);
+    dst = tofu_tensor_elew(src1, src2, dst, TOFU_SUM);
+    
+    ck_assert_array_float_eq_tol((float *)dst->data, expected_result, dst->len, 0);
+    tofu_assert_tensor_eq(dst, expected);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+    tofu_tensor_free(expected);
+    
+    // Test case 4: Non-broadcastable tensors should return NULL
+    float non_bc_src1[] = {1, 2, 3};
+    float non_bc_src2[] = {4, 5}; 
+    
+    src1 = tofu_tensor_create(non_bc_src1, 1, (int[]){3}, TOFU_FLOAT);
+    src2 = tofu_tensor_create(non_bc_src2, 1, (int[]){2}, TOFU_FLOAT);
+    
+    // This should return NULL as dimensions 3 and 2 are incompatible
+    dst = tofu_tensor_elew(src1, src2, NULL, TOFU_SUM);
+    ck_assert_ptr_eq(dst, NULL);
+    
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_matmul)
+{
+    tofu_tensor *src1, *src2, *dst;
+
+    /* Test case 1: 1-D @ 1-D -> scalar (dot product) */
+    int32_t vec1_data[3] = {1, 2, 3};
+    int32_t vec2_data[3] = {4, 5, 6};
+    src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(vec2_data, 1, ARR(int, 3), TOFU_INT32);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 2: 2-D @ 2-D -> matrix multiplication [2,3] @ [3,2] -> [2,2] */
+    int32_t mat1_data[6] = {1, 2, 3, 4, 5, 6};
+    int32_t mat2_data[6] = {1, 1, 2, 2, 3, 3};
+    int32_t expected_2x2[4] = {14, 14, 32, 32};
+    src1 = tofu_tensor_create(mat1_data, 2, ARR(int, 2, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(mat2_data, 2, ARR(int, 3, 2), TOFU_INT32);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 2);
+    for (int i = 0; i < 4; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_2x2[i]);
+    }
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 3: 2-D @ 1-D -> matrix-vector [2,3] @ [3] -> [2] */
+    src1 = tofu_tensor_create(mat1_data, 2, ARR(int, 2, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 14);
+    ck_assert_int_eq(((int32_t*)dst->data)[1], 32);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 4: 1-D @ 2-D -> vector-matrix [3] @ [3,2] -> [2] */
+    src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(mat2_data, 2, ARR(int, 3, 2), TOFU_INT32);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 14);
+    ck_assert_int_eq(((int32_t*)dst->data)[1], 14);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 5: 3-D @ 3-D -> batch matmul [2,3,4] @ [2,4,5] -> [2,3,5] */
+    float batch1_data[24];
+    for (int i = 0; i < 24; i++) batch1_data[i] = i + 1.0f;
+    float batch2_data[40];
+    for (int i = 0; i < 40; i++) batch2_data[i] = 1.0f;
+
+    src1 = tofu_tensor_create(batch1_data, 3, ARR(int, 2, 3, 4), TOFU_FLOAT);
+    src2 = tofu_tensor_create(batch2_data, 3, ARR(int, 2, 4, 5), TOFU_FLOAT);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->dims[2], 5);
+    // First element: sum(1,2,3,4) = 10
+    ck_assert(fabsf(((float*)dst->data)[0] - 10.0f) < 1e-5);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 6: Broadcasting [3,4] @ [2,4,5] -> [2,3,5] */
+    float mat_data[12];
+    for (int i = 0; i < 12; i++) mat_data[i] = i + 1.0f;
+
+    src1 = tofu_tensor_create(mat_data, 2, ARR(int, 3, 4), TOFU_FLOAT);
+    src2 = tofu_tensor_create(batch2_data, 3, ARR(int, 2, 4, 5), TOFU_FLOAT);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 3);
+    ck_assert_int_eq(dst->dims[2], 5);
+    // Both batches should have same result (broadcasting)
+    ck_assert(fabsf(((float*)dst->data)[0] - 10.0f) < 1e-5);
+    ck_assert(fabsf(((float*)dst->data)[15] - 10.0f) < 1e-5); // Second batch first element
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 7: Edge case - single element matrices [2,1,1] @ [2,1,1] -> [2,1,1] */
+    int32_t single1_data[2] = {5, 10};
+    int32_t single2_data[2] = {2, 3};
+    src1 = tofu_tensor_create(single1_data, 3, ARR(int, 2, 1, 1), TOFU_INT32);
+    src2 = tofu_tensor_create(single2_data, 3, ARR(int, 2, 1, 1), TOFU_INT32);
+    dst = tofu_tensor_matmul(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 3);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 1);
+    ck_assert_int_eq(dst->dims[2], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 10);
+    ck_assert_int_eq(((int32_t*)dst->data)[1], 30);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 8: Pre-allocated destination tensor */
+    src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(vec2_data, 1, ARR(int, 3), TOFU_INT32);
+    dst = tofu_tensor_zeros(1, ARR(int, 1), TOFU_INT32);
+    dst = tofu_tensor_matmul(src1, src2, dst);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 1);
+    ck_assert_int_eq(dst->dims[0], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 32);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+}
+LN_TEST_END
+
+LN_TEST_START(test_tofu_tensor_outer)
+{
+    tofu_tensor *src1, *src2, *dst;
+
+    /* Test case 1: Basic 1-D outer 1-D: [3] outer [4] -> [3,4] */
+    int32_t vec1_data[3] = {1, 2, 3};
+    int32_t vec2_data[4] = {4, 5, 6, 7};
+    int32_t expected_3x4[12] = {4, 5, 6, 7, 8, 10, 12, 14, 12, 15, 18, 21};
+
+    src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(vec2_data, 1, ARR(int, 4), TOFU_INT32);
+    dst = tofu_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 4);
+    for (int i = 0; i < 12; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_3x4[i]);
+    }
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 2: Scalar outer product [1] outer [1] -> [1,1] */
+    int32_t scalar1 = 5;
+    int32_t scalar2 = 3;
+    src1 = tofu_tensor_create(&scalar1, 1, ARR(int, 1), TOFU_INT32);
+    src2 = tofu_tensor_create(&scalar2, 1, ARR(int, 1), TOFU_INT32);
+    dst = tofu_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 1);
+    ck_assert_int_eq(dst->dims[1], 1);
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 15);
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 3: Different sizes [2] outer [5] -> [2,5] */
+    float a_data[2] = {1.0f, 2.0f};
+    float b_data[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    float expected_2x5[10] = {1, 2, 3, 4, 5, 2, 4, 6, 8, 10};
+
+    src1 = tofu_tensor_create(a_data, 1, ARR(int, 2), TOFU_FLOAT);
+    src2 = tofu_tensor_create(b_data, 1, ARR(int, 5), TOFU_FLOAT);
+    dst = tofu_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 2);
+    ck_assert_int_eq(dst->dims[1], 5);
+    for (int i = 0; i < 10; i++) {
+        ck_assert(fabsf(((float*)dst->data)[i] - expected_2x5[i]) < 1e-5);
+    }
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 4: Multi-dimensional inputs (flattened) [2,2] outer [2,2] -> [4,4] */
+    int32_t mat1_data[4] = {1, 2, 3, 4};
+    int32_t mat2_data[4] = {1, 1, 2, 2};
+
+    src1 = tofu_tensor_create(mat1_data, 2, ARR(int, 2, 2), TOFU_INT32);
+    src2 = tofu_tensor_create(mat2_data, 2, ARR(int, 2, 2), TOFU_INT32);
+    dst = tofu_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 4);  // flattened src1
+    ck_assert_int_eq(dst->dims[1], 4);  // flattened src2
+    // Verify a few elements: out[i,j] = src1[i] * src2[j]
+    ck_assert_int_eq(((int32_t*)dst->data)[0], 1);   // [0,0]: 1*1
+    ck_assert_int_eq(((int32_t*)dst->data)[5], 2);   // [1,1]: 2*1
+    ck_assert_int_eq(((int32_t*)dst->data)[10], 6);  // [2,2]: 3*2
+    ck_assert_int_eq(((int32_t*)dst->data)[15], 8);  // [3,3]: 4*2
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 5: Negative numbers [3] outer [3] -> [3,3] */
+    int32_t neg_data1[3] = {-1, 0, 1};
+    int32_t neg_data2[3] = {1, 2, 3};
+    int32_t expected_neg[9] = {-1, -2, -3, 0, 0, 0, 1, 2, 3};
+
+    src1 = tofu_tensor_create(neg_data1, 1, ARR(int, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(neg_data2, 1, ARR(int, 3), TOFU_INT32);
+    dst = tofu_tensor_outer(src1, src2, NULL);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 3);
+    for (int i = 0; i < 9; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_neg[i]);
+    }
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+
+    /* Test case 6: Pre-allocated destination */
+    src1 = tofu_tensor_create(vec1_data, 1, ARR(int, 3), TOFU_INT32);
+    src2 = tofu_tensor_create(vec2_data, 1, ARR(int, 4), TOFU_INT32);
+    dst = tofu_tensor_zeros(2, ARR(int, 3, 4), TOFU_INT32);
+    dst = tofu_tensor_outer(src1, src2, dst);
+
+    ck_assert_ptr_nonnull(dst);
+    ck_assert_int_eq(dst->ndim, 2);
+    ck_assert_int_eq(dst->dims[0], 3);
+    ck_assert_int_eq(dst->dims[1], 4);
+    for (int i = 0; i < 12; i++) {
+        ck_assert_int_eq(((int32_t*)dst->data)[i], expected_3x4[i]);
+    }
+
+    tofu_tensor_free(src1);
+    tofu_tensor_free(src2);
+    tofu_tensor_free_data_too(dst);
+}
+LN_TEST_END
+/* end of tests */
+
+LN_TEST_TCASE_START(tensor, checked_setup, checked_teardown)
+{
+    LN_TEST_ADD_TEST(test_tofu_tensor_create);
+    LN_TEST_ADD_TEST(test_tofu_tensor_free);
+    LN_TEST_ADD_TEST(test_tofu_tensor_clone);
+    LN_TEST_ADD_TEST(test_tofu_tensor_repeat);
+    LN_TEST_ADD_TEST(test_tofu_tensor_arange);
+    LN_TEST_ADD_TEST(test_tofu_tensor_rearange);
+    LN_TEST_ADD_TEST(test_tofu_tensor_issameshape);
+    LN_TEST_ADD_TEST(test_tofu_tensor_fprint);
+    LN_TEST_ADD_TEST(test_tofu_tensor_print);
+    LN_TEST_ADD_TEST(test_tofu_tensor_save);
+    LN_TEST_ADD_TEST(test_tofu_tensor_zeros_slice);
+    LN_TEST_ADD_TEST(test_tofu_tensor_slice);
+    LN_TEST_ADD_TEST(test_tofu_tensor_slice_nocopy);
+    LN_TEST_ADD_TEST(test_tofu_tensor_concat);
+    LN_TEST_ADD_TEST(test_tofu_tensor_reshape);
+    LN_TEST_ADD_TEST(test_tofu_tensor_maxreduce);
+    LN_TEST_ADD_TEST(test_tofu_tensor_elew);
+    LN_TEST_ADD_TEST(test_tofu_tensor_elew_param);
+    LN_TEST_ADD_TEST(test_tofu_tensor_inner);
+    LN_TEST_ADD_TEST(test_tofu_tensor_matmul);
+    LN_TEST_ADD_TEST(test_tofu_tensor_outer);
+    LN_TEST_ADD_TEST(test_tofu_tensor_transpose);
+    LN_TEST_ADD_TEST(test_tofu_tensor_lrelu);
+    LN_TEST_ADD_TEST(test_tofu_tensor_convert);
+    LN_TEST_ADD_TEST(test_tofu_tensor_resize);
+    LN_TEST_ADD_TEST(test_tofu_tensor_submean);
+    LN_TEST_ADD_TEST(test_tofu_tensor_isbroadcastable);
+    LN_TEST_ADD_TEST(test_tofu_tensor_broadcast_to);
+    LN_TEST_ADD_TEST(test_tofu_tensor_elew_broadcast);
+    LN_TEST_ADD_TEST(test_tofu_tensor_elew_with_broadcasting);
+    LN_TEST_ADD_TEST(test_tofu_tensor_elew_param_with_broadcasting);
+    LN_TEST_ADD_TEST(test_tofu_tensor_broadcasting_edge_cases);
+}
+LN_TEST_TCASE_END
+
+LN_TEST_ADD_TCASE(tensor);

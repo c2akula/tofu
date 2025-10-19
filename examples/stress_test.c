@@ -7,23 +7,23 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
-#include "tl_tensor.h"
+#include "tofu_tensor.h"
 
 /* Simple ReLU */
-void relu(tl_tensor* t) {
+void relu(tofu_tensor* t) {
     for (int i = 0; i < t->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(t, i, val, TOFU_FLOAT);
         if (val < 0) val = 0;
-        TL_TENSOR_DATA_FROM(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_FROM(t, i, val, TOFU_FLOAT);
     }
 }
 
 /* Check for NaN/Inf */
-int has_invalid_values(tl_tensor* t) {
+int has_invalid_values(tofu_tensor* t) {
     for (int i = 0; i < t->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(t, i, val, TOFU_FLOAT);
         if (isnan(val) || isinf(val)) {
             return 1;
         }
@@ -32,10 +32,10 @@ int has_invalid_values(tl_tensor* t) {
 }
 
 /* Initialize tensor with random values */
-void init_random(tl_tensor* t, float scale) {
+void init_random(tofu_tensor* t, float scale) {
     for (int i = 0; i < t->len; i++) {
         float val = ((float)rand() / RAND_MAX - 0.5f) * scale;
-        TL_TENSOR_DATA_FROM(t, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_FROM(t, i, val, TOFU_FLOAT);
     }
 }
 
@@ -60,9 +60,9 @@ int main() {
 
     /* Create tensors */
     printf("  Allocating tensors...\n");
-    tl_tensor* X = tl_tensor_zeros(2, (int[]){BATCH_SIZE, INPUT_SIZE}, TL_FLOAT);
-    tl_tensor* W1 = tl_tensor_zeros(2, (int[]){INPUT_SIZE, HIDDEN_SIZE}, TL_FLOAT);
-    tl_tensor* W2 = tl_tensor_zeros(2, (int[]){HIDDEN_SIZE, OUTPUT_SIZE}, TL_FLOAT);
+    tofu_tensor* X = tofu_tensor_zeros(2, (int[]){BATCH_SIZE, INPUT_SIZE}, TOFU_FLOAT);
+    tofu_tensor* W1 = tofu_tensor_zeros(2, (int[]){INPUT_SIZE, HIDDEN_SIZE}, TOFU_FLOAT);
+    tofu_tensor* W2 = tofu_tensor_zeros(2, (int[]){HIDDEN_SIZE, OUTPUT_SIZE}, TOFU_FLOAT);
 
     if (!X || !W1 || !W2) {
         fprintf(stderr, "  ✗ Failed to allocate tensors\n");
@@ -83,7 +83,7 @@ int main() {
            BATCH_SIZE, HIDDEN_SIZE);
 
     clock_t start = clock();
-    tl_tensor* h1 = tl_tensor_matmul(X, W1, NULL);
+    tofu_tensor* h1 = tofu_tensor_matmul(X, W1, NULL);
     clock_t end = clock();
 
     if (!h1) {
@@ -108,7 +108,7 @@ int main() {
            BATCH_SIZE, OUTPUT_SIZE);
 
     start = clock();
-    tl_tensor* output = tl_tensor_matmul(h1, W2, NULL);
+    tofu_tensor* output = tofu_tensor_matmul(h1, W2, NULL);
     end = clock();
 
     if (!output) {
@@ -129,7 +129,7 @@ int main() {
     float sum = 0, min = INFINITY, max = -INFINITY;
     for (int i = 0; i < output->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(output, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output, i, val, TOFU_FLOAT);
         sum += val;
         if (val < min) min = val;
         if (val > max) max = val;
@@ -138,11 +138,11 @@ int main() {
     printf("  Output stats: min=%.6f, max=%.6f, mean=%.6f\n\n", min, max, mean);
 
     /* Cleanup */
-    tl_tensor_free_data_too(X);
-    tl_tensor_free_data_too(W1);
-    tl_tensor_free_data_too(W2);
-    tl_tensor_free_data_too(h1);
-    tl_tensor_free_data_too(output);
+    tofu_tensor_free_data_too(X);
+    tofu_tensor_free_data_too(W1);
+    tofu_tensor_free_data_too(W2);
+    tofu_tensor_free_data_too(h1);
+    tofu_tensor_free_data_too(output);
 
     /* Test 2: Very deep network (memory stress) */
     printf("Test 2: Very deep network (10 layers)\n");
@@ -152,14 +152,14 @@ int main() {
     printf("  Network: 10 layers, %d neurons each\n", LAYER_SIZE);
     printf("  Total parameters: %d\n\n", DEPTH * LAYER_SIZE * LAYER_SIZE);
 
-    tl_tensor* layers[DEPTH + 1];
-    layers[0] = tl_tensor_zeros(2, (int[]){1, LAYER_SIZE}, TL_FLOAT);
+    tofu_tensor* layers[DEPTH + 1];
+    layers[0] = tofu_tensor_zeros(2, (int[]){1, LAYER_SIZE}, TOFU_FLOAT);
     init_random(layers[0], 1.0f);
 
     printf("  Creating %d weight matrices...\n", DEPTH);
-    tl_tensor* weights[DEPTH];
+    tofu_tensor* weights[DEPTH];
     for (int i = 0; i < DEPTH; i++) {
-        weights[i] = tl_tensor_zeros(2, (int[]){LAYER_SIZE, LAYER_SIZE}, TL_FLOAT);
+        weights[i] = tofu_tensor_zeros(2, (int[]){LAYER_SIZE, LAYER_SIZE}, TOFU_FLOAT);
         if (!weights[i]) {
             fprintf(stderr, "  ✗ Failed to allocate weight matrix %d\n", i);
             return 1;
@@ -172,7 +172,7 @@ int main() {
     printf("  Forward pass through %d layers...\n", DEPTH);
     start = clock();
     for (int i = 0; i < DEPTH; i++) {
-        layers[i + 1] = tl_tensor_matmul(layers[i], weights[i], NULL);
+        layers[i + 1] = tofu_tensor_matmul(layers[i], weights[i], NULL);
         if (!layers[i + 1]) {
             fprintf(stderr, "  ✗ Layer %d matmul failed\n", i);
             return 1;
@@ -189,13 +189,13 @@ int main() {
     printf("  ✓ Completed in %.2f ms\n", time_ms);
 
     /* Final output stats */
-    tl_tensor* final = layers[DEPTH];
+    tofu_tensor* final = layers[DEPTH];
     sum = 0;
     min = INFINITY;
     max = -INFINITY;
     for (int i = 0; i < final->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(final, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(final, i, val, TOFU_FLOAT);
         sum += val;
         if (val < min) min = val;
         if (val > max) max = val;
@@ -205,10 +205,10 @@ int main() {
 
     /* Cleanup */
     for (int i = 0; i <= DEPTH; i++) {
-        tl_tensor_free_data_too(layers[i]);
+        tofu_tensor_free_data_too(layers[i]);
     }
     for (int i = 0; i < DEPTH; i++) {
-        tl_tensor_free_data_too(weights[i]);
+        tofu_tensor_free_data_too(weights[i]);
     }
 
     printf("\n============================================================\n");

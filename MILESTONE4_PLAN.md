@@ -46,9 +46,9 @@ After v0.9.0, the public API is **frozen** for v1.0.0:
 
 **Criteria to Check**:
 - ✓ All functions use `snake_case`
-- ✓ All functions prefixed with `tl_` (namespace)
-- ✓ Struct names follow `tl_<name>` pattern
-- ✓ Enum values use `TL_<NAME>` pattern
+- ✓ All functions prefixed with `tofu_` (namespace)
+- ✓ Struct names follow `tofu_<name>` pattern
+- ✓ Enum values use `TOFU_<NAME>` pattern
 - ✓ No Hungarian notation (no `pFoo`, `iCount`)
 - ✓ Clear, descriptive names (avoid abbreviations)
 
@@ -71,18 +71,18 @@ After v0.9.0, the public API is **frozen** for v1.0.0:
 
 **Questions to Answer**:
 1. **Parameter Order**: Is it consistent?
-   - Example: `tl_tensor_create(data, ndim, dims, dtype)` - is order logical?
+   - Example: `tofu_tensor_create(data, ndim, dims, dtype)` - is order logical?
    - Do similar functions follow same parameter order?
 
 2. **NULL Handling**: Is it consistent?
    - Which parameters can be NULL?
    - Is behavior documented?
-   - Example: `tl_tensor_matmul(src1, src2, dst)` - can `dst` be NULL?
+   - Example: `tofu_tensor_matmul(src1, src2, dst)` - can `dst` be NULL?
 
 3. **Ownership Semantics**: Who owns what?
    - When does caller need to free memory?
    - When does function take ownership?
-   - Example: `tl_graph_input(g, tensor)` - does graph own tensor?
+   - Example: `tofu_graph_input(g, tensor)` - does graph own tensor?
 
 4. **Error Handling**: Is it consistent?
    - Current: mostly `assert()` for errors
@@ -118,7 +118,7 @@ After v0.9.0, the public API is **frozen** for v1.0.0:
  * @return Description of return value
  * @note Additional notes (ownership, thread-safety, etc.)
  */
-TL_EXPORT tl_tensor* tl_tensor_create(...);
+TOFU_EXPORT tofu_tensor* tofu_tensor_create(...);
 ```
 
 **Priority Order**:
@@ -127,9 +127,9 @@ TL_EXPORT tl_tensor* tl_tensor_create(...);
 3. **Low**: Utility functions
 
 **Actions**:
-1. Add comments to `tl_tensor.h` (30+ functions)
-2. Add comments to `tl_graph.h` (20+ functions)
-3. Add comments to `tl_optimizer.h` (10+ functions)
+1. Add comments to `tofu_tensor.h` (30+ functions)
+2. Add comments to `tofu_graph.h` (20+ functions)
+3. Add comments to `tofu_optimizer.h` (10+ functions)
 
 **Deliverable**: Updated header files with inline documentation
 
@@ -407,8 +407,8 @@ The following items are **not critical** for v1.0.0:
 |-----|-------|-------|------|
 | 1 | API Audit | 1.1 Inventory, 1.2 Naming | 6-8h |
 | 2 | API Audit | 1.3 Usability Review | 4-6h |
-| 3 | API Docs | 2.1 Function Comments (tl_tensor.h) | 6-8h |
-| 4 | API Docs | 2.1 Function Comments (tl_graph.h, tl_optimizer.h), 2.2 Stability Doc | 6-8h |
+| 3 | API Docs | 2.1 Function Comments (tofu_tensor.h) | 6-8h |
+| 4 | API Docs | 2.1 Function Comments (tofu_graph.h, tofu_optimizer.h), 2.2 Stability Doc | 6-8h |
 | 5 | Performance | 3.1 Micro-benchmarks, 3.2 Profiling (optional) | 6-8h |
 | 6 | Build System | 4.1 macOS, 4.2 ESP32, 4.3 Platform Docs | 4-6h |
 | 7 | Release Prep | 5.1 Release Notes, 5.2 Version Bump, 5.3 Testing, 5.4 Tag | 6-8h |

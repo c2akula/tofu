@@ -19,32 +19,32 @@
 ## Quick Start
 
 ```c
-#include "tl_graph.h"
-#include "tl_tensor.h"
-#include "tl_optimizer.h"
+#include "tofu_graph.h"
+#include "tofu_tensor.h"
+#include "tofu_optimizer.h"
 
 // Create computation graph
-tl_graph* g = tl_graph_create();
+tofu_graph* g = tofu_graph_create();
 
 // Build simple neural network: [2] → [4] → [1]
 float W1_data[8], W2_data[4], input_data[2] = {1.0f, 2.0f};
-tl_tensor* t_input = tl_tensor_create(input_data, 1, (int[]){2}, TL_FLOAT);
-tl_tensor* t_W1 = tl_tensor_create(W1_data, 2, (int[]){2, 4}, TL_FLOAT);
-tl_tensor* t_W2 = tl_tensor_create(W2_data, 2, (int[]){4, 1}, TL_FLOAT);
+tofu_tensor* t_input = tofu_tensor_create(input_data, 1, (int[]){2}, TOFU_FLOAT);
+tofu_tensor* t_W1 = tofu_tensor_create(W1_data, 2, (int[]){2, 4}, TOFU_FLOAT);
+tofu_tensor* t_W2 = tofu_tensor_create(W2_data, 2, (int[]){4, 1}, TOFU_FLOAT);
 
 // Forward pass
-tl_graph_node* x = tl_graph_input(g, t_input);
-tl_graph_node* W1 = tl_graph_param(g, t_W1);
-tl_graph_node* h = tl_graph_matmul(g, x, W1);
-tl_graph_node* h_act = tl_graph_relu(g, h);
-tl_graph_node* W2 = tl_graph_param(g, t_W2);
-tl_graph_node* output = tl_graph_matmul(g, h_act, W2);
+tofu_graph_node* x = tofu_graph_input(g, t_input);
+tofu_graph_node* W1 = tofu_graph_param(g, t_W1);
+tofu_graph_node* h = tofu_graph_matmul(g, x, W1);
+tofu_graph_node* h_act = tofu_graph_relu(g, h);
+tofu_graph_node* W2 = tofu_graph_param(g, t_W2);
+tofu_graph_node* output = tofu_graph_matmul(g, h_act, W2);
 
 // Backward pass (automatic differentiation)
-tl_graph_backward(g, output);
+tofu_graph_backward(g, output);
 
 // Gradients computed in W1->grad, W2->grad
-tl_graph_free(g);
+tofu_graph_free(g);
 ```
 
 See [examples/](examples/) for complete training examples including MLP, ViT, and more.
@@ -146,7 +146,7 @@ This will create an Ubuntu 22.04 container with all required dependencies and ru
     the installation directory.
 
 ## Usage
-Include `tl_tensor.h` in your project to use Tofu functions.
+Include `tofu_tensor.h` in your project to use Tofu functions.
 
 You can use the following command to get the compilation and linking flags when
 building your project.
@@ -167,13 +167,13 @@ Tofu now supports broadcasting operations similar to NumPy. Broadcasting allows 
 
 ```c
 // Check if two tensors can be broadcast together
-int tl_tensor_isbroadcastable(const tl_tensor *t1, const tl_tensor *t2);
+int tofu_tensor_isbroadcastable(const tofu_tensor *t1, const tofu_tensor *t2);
 
 // Broadcast a tensor to a new shape
-tl_tensor *tl_tensor_broadcast_to(const tl_tensor *src, tl_tensor *dst, int ndim, const int *dims);
+tofu_tensor *tofu_tensor_broadcast_to(const tofu_tensor *src, tofu_tensor *dst, int ndim, const int *dims);
 
 // Element-wise operation with broadcasting
-tl_tensor *tl_tensor_elew_broadcast(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst, tl_elew_op elew_op);
+tofu_tensor *tofu_tensor_elew_broadcast(const tofu_tensor *src1, const tofu_tensor *src2, tofu_tensor *dst, tofu_elew_op elew_op);
 ```
 
 ### Broadcasting Examples
@@ -181,16 +181,16 @@ tl_tensor *tl_tensor_elew_broadcast(const tl_tensor *src1, const tl_tensor *src2
 ```c
 // Example 1: Broadcasting a scalar to a matrix
 float scalar_val = 5.0f;
-tl_tensor *scalar = tl_tensor_create(&scalar_val, 1, (int[]){1}, TL_FLOAT);
-tl_tensor *result = tl_tensor_broadcast_to(scalar, NULL, 2, (int[]){3, 4});
+tofu_tensor *scalar = tofu_tensor_create(&scalar_val, 1, (int[]){1}, TOFU_FLOAT);
+tofu_tensor *result = tofu_tensor_broadcast_to(scalar, NULL, 2, (int[]){3, 4});
 // result will be a 3×4 matrix filled with 5.0
 
 // Example 2: Element-wise multiplication with broadcasting
 float arr1[] = {1, 2, 3};  // Shape: [3]
 float arr2[] = {10, 20};   // Shape: [2, 1]
-tl_tensor *t1 = tl_tensor_create(arr1, 1, (int[]){3}, TL_FLOAT);
-tl_tensor *t2 = tl_tensor_create(arr2, 2, (int[]){2, 1}, TL_FLOAT);
-tl_tensor *result = tl_tensor_elew_broadcast(t1, t2, NULL, TL_MUL);
+tofu_tensor *t1 = tofu_tensor_create(arr1, 1, (int[]){3}, TOFU_FLOAT);
+tofu_tensor *t2 = tofu_tensor_create(arr2, 2, (int[]){2, 1}, TOFU_FLOAT);
+tofu_tensor *result = tofu_tensor_elew_broadcast(t1, t2, NULL, TOFU_MUL);
 // result will have shape [2, 3] and values [[10, 20, 30], [20, 40, 60]]
 ```
 
@@ -203,7 +203,7 @@ Tofu provides NumPy-compatible tensor operations for linear algebra and tensor m
 Computes the inner product (sum-product over last axes) with cartesian product semantics.
 
 ```c
-tl_tensor *tl_tensor_inner(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+tofu_tensor *tofu_tensor_inner(const tofu_tensor *src1, const tofu_tensor *src2, tofu_tensor *dst);
 ```
 
 **Behavior:**
@@ -218,17 +218,17 @@ tl_tensor *tl_tensor_inner(const tl_tensor *src1, const tl_tensor *src2, tl_tens
 // Vector dot product
 float a[] = {1, 2, 3};
 float b[] = {4, 5, 6};
-tl_tensor *v1 = tl_tensor_create(a, 1, (int[]){3}, TL_FLOAT);
-tl_tensor *v2 = tl_tensor_create(b, 1, (int[]){3}, TL_FLOAT);
-tl_tensor *result = tl_tensor_inner(v1, v2, NULL);
+tofu_tensor *v1 = tofu_tensor_create(a, 1, (int[]){3}, TOFU_FLOAT);
+tofu_tensor *v2 = tofu_tensor_create(b, 1, (int[]){3}, TOFU_FLOAT);
+tofu_tensor *result = tofu_tensor_inner(v1, v2, NULL);
 // result: scalar 32.0 (1*4 + 2*5 + 3*6)
 
 // Matrix inner product [2,3] × [2,3] → [2,2]
 float mat1[] = {1, 2, 3, 4, 5, 6};
 float mat2[] = {1, 1, 1, 2, 2, 2};
-tl_tensor *m1 = tl_tensor_create(mat1, 2, (int[]){2, 3}, TL_FLOAT);
-tl_tensor *m2 = tl_tensor_create(mat2, 2, (int[]){2, 3}, TL_FLOAT);
-result = tl_tensor_inner(m1, m2, NULL);
+tofu_tensor *m1 = tofu_tensor_create(mat1, 2, (int[]){2, 3}, TOFU_FLOAT);
+tofu_tensor *m2 = tofu_tensor_create(mat2, 2, (int[]){2, 3}, TOFU_FLOAT);
+result = tofu_tensor_inner(m1, m2, NULL);
 // result[i,j] = sum(m1[i,:] * m2[j,:])
 ```
 
@@ -237,7 +237,7 @@ result = tl_tensor_inner(m1, m2, NULL);
 Computes matrix multiplication with broadcasting on batch dimensions.
 
 ```c
-tl_tensor *tl_tensor_matmul(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+tofu_tensor *tofu_tensor_matmul(const tofu_tensor *src1, const tofu_tensor *src2, tofu_tensor *dst);
 ```
 
 **Behavior:**
@@ -254,9 +254,9 @@ tl_tensor *tl_tensor_matmul(const tl_tensor *src1, const tl_tensor *src2, tl_ten
 // Standard matrix multiplication [2,3] @ [3,2] → [2,2]
 float a[] = {1, 2, 3, 4, 5, 6};
 float b[] = {1, 1, 2, 2, 3, 3};
-tl_tensor *m1 = tl_tensor_create(a, 2, (int[]){2, 3}, TL_FLOAT);
-tl_tensor *m2 = tl_tensor_create(b, 2, (int[]){3, 2}, TL_FLOAT);
-tl_tensor *result = tl_tensor_matmul(m1, m2, NULL);
+tofu_tensor *m1 = tofu_tensor_create(a, 2, (int[]){2, 3}, TOFU_FLOAT);
+tofu_tensor *m2 = tofu_tensor_create(b, 2, (int[]){3, 2}, TOFU_FLOAT);
+tofu_tensor *result = tofu_tensor_matmul(m1, m2, NULL);
 // Standard matrix multiply: result[i,j] = sum(m1[i,:] * m2[:,j])
 
 // Batch matrix multiplication with broadcasting [3,4] @ [2,4,5] → [2,3,5]
@@ -268,7 +268,7 @@ tl_tensor *result = tl_tensor_matmul(m1, m2, NULL);
 Computes the outer product (cartesian product without summation).
 
 ```c
-tl_tensor *tl_tensor_outer(const tl_tensor *src1, const tl_tensor *src2, tl_tensor *dst);
+tofu_tensor *tofu_tensor_outer(const tofu_tensor *src1, const tofu_tensor *src2, tofu_tensor *dst);
 ```
 
 **Behavior:**
@@ -283,9 +283,9 @@ tl_tensor *tl_tensor_outer(const tl_tensor *src1, const tl_tensor *src2, tl_tens
 // Vector outer product [3] outer [4] → [3,4]
 float a[] = {1, 2, 3};
 float b[] = {4, 5, 6, 7};
-tl_tensor *v1 = tl_tensor_create(a, 1, (int[]){3}, TL_FLOAT);
-tl_tensor *v2 = tl_tensor_create(b, 1, (int[]){4}, TL_FLOAT);
-tl_tensor *result = tl_tensor_outer(v1, v2, NULL);
+tofu_tensor *v1 = tofu_tensor_create(a, 1, (int[]){3}, TOFU_FLOAT);
+tofu_tensor *v2 = tofu_tensor_create(b, 1, (int[]){4}, TOFU_FLOAT);
+tofu_tensor *result = tofu_tensor_outer(v1, v2, NULL);
 // result[i,j] = a[i] * b[j]
 // [[4,  5,  6,  7],
 //  [8, 10, 12, 14],
@@ -314,10 +314,10 @@ All tensor operations accept an optional pre-allocated destination tensor:
 
 ```c
 // Create destination tensor first
-tl_tensor *dst = tl_tensor_zeros(2, (int[]){2, 2}, TL_FLOAT);
+tofu_tensor *dst = tofu_tensor_zeros(2, (int[]){2, 2}, TOFU_FLOAT);
 
 // Use pre-allocated destination
-tl_tensor *result = tl_tensor_matmul(m1, m2, dst);
+tofu_tensor *result = tofu_tensor_matmul(m1, m2, dst);
 // result points to dst (reused)
 ```
 

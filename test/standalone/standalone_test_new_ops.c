@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <math.h>
-#include "tl_tensor.h"
+#include "tofu_tensor.h"
 
 #define EPSILON 1e-5
 
@@ -14,23 +14,23 @@ int test_sumreduce() {
     /* Test data: [2, 3] */
     float data[] = {1.0f, 2.0f, 3.0f,
                     4.0f, 5.0f, 6.0f};
-    tl_tensor* t = tl_tensor_create(data, 2, (int[]){2, 3}, TL_FLOAT);
+    tofu_tensor* t = tofu_tensor_create(data, 2, (int[]){2, 3}, TOFU_FLOAT);
 
     /* Sum along axis 1 (columns): expect [6, 15] */
-    tl_tensor* sum = tl_tensor_sumreduce(t, NULL, 1);
+    tofu_tensor* sum = tofu_tensor_sumreduce(t, NULL, 1);
     float expected[] = {6.0f, 15.0f};
 
     for (int i = 0; i < 2; i++) {
         float val;
-        TL_TENSOR_DATA_TO(sum, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(sum, i, val, TOFU_FLOAT);
         if (fabsf(val - expected[i]) > EPSILON) {
             printf("  ✗ FAILED: expected %.2f, got %.2f\n", expected[i], val);
             return 0;
         }
     }
 
-    tl_tensor_free(t);  /* t uses stack data, don't free data */
-    tl_tensor_free_data_too(sum);
+    tofu_tensor_free(t);  /* t uses stack data, don't free data */
+    tofu_tensor_free_data_too(sum);
     printf("  ✓ PASSED\n\n");
     return 1;
 }
@@ -41,23 +41,23 @@ int test_meanreduce() {
     /* Test data: [2, 3] */
     float data[] = {1.0f, 2.0f, 3.0f,
                     4.0f, 5.0f, 6.0f};
-    tl_tensor* t = tl_tensor_create(data, 2, (int[]){2, 3}, TL_FLOAT);
+    tofu_tensor* t = tofu_tensor_create(data, 2, (int[]){2, 3}, TOFU_FLOAT);
 
     /* Mean along axis 1 (columns): expect [2, 5] */
-    tl_tensor* mean = tl_tensor_meanreduce(t, NULL, 1);
+    tofu_tensor* mean = tofu_tensor_meanreduce(t, NULL, 1);
     float expected[] = {2.0f, 5.0f};
 
     for (int i = 0; i < 2; i++) {
         float val;
-        TL_TENSOR_DATA_TO(mean, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(mean, i, val, TOFU_FLOAT);
         if (fabsf(val - expected[i]) > EPSILON) {
             printf("  ✗ FAILED: expected %.2f, got %.2f\n", expected[i], val);
             return 0;
         }
     }
 
-    tl_tensor_free(t);  /* t uses stack data, don't free data */
-    tl_tensor_free_data_too(mean);
+    tofu_tensor_free(t);  /* t uses stack data, don't free data */
+    tofu_tensor_free_data_too(mean);
     printf("  ✓ PASSED\n\n");
     return 1;
 }
@@ -68,17 +68,17 @@ int test_softmax() {
     /* Test data: [2, 3] */
     float data[] = {1.0f, 2.0f, 3.0f,
                     4.0f, 5.0f, 6.0f};
-    tl_tensor* t = tl_tensor_create(data, 2, (int[]){2, 3}, TL_FLOAT);
+    tofu_tensor* t = tofu_tensor_create(data, 2, (int[]){2, 3}, TOFU_FLOAT);
 
     /* Softmax along axis 1 */
-    tl_tensor* softmax = tl_tensor_softmax(t, NULL, 1);
+    tofu_tensor* softmax = tofu_tensor_softmax(t, NULL, 1);
 
     /* Check that each row sums to 1 */
     for (int row = 0; row < 2; row++) {
         float sum = 0.0f;
         for (int col = 0; col < 3; col++) {
             float val;
-            TL_TENSOR_DATA_TO(softmax, row * 3 + col, val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(softmax, row * 3 + col, val, TOFU_FLOAT);
             sum += val;
         }
         if (fabsf(sum - 1.0f) > EPSILON) {
@@ -90,15 +90,15 @@ int test_softmax() {
     /* Check numerical stability (no NaN/Inf) */
     for (int i = 0; i < softmax->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(softmax, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(softmax, i, val, TOFU_FLOAT);
         if (isnan(val) || isinf(val)) {
             printf("  ✗ FAILED: found NaN/Inf at index %d\n", i);
             return 0;
         }
     }
 
-    tl_tensor_free(t);  /* t uses stack data, don't free data */
-    tl_tensor_free_data_too(softmax);
+    tofu_tensor_free(t);  /* t uses stack data, don't free data */
+    tofu_tensor_free_data_too(softmax);
     printf("  ✓ PASSED\n\n");
     return 1;
 }
@@ -109,23 +109,23 @@ int test_layer_norm() {
     /* Test data: [2, 4] */
     float data[] = {1.0f, 2.0f, 3.0f, 4.0f,
                     5.0f, 6.0f, 7.0f, 8.0f};
-    tl_tensor* t = tl_tensor_create(data, 2, (int[]){2, 4}, TL_FLOAT);
+    tofu_tensor* t = tofu_tensor_create(data, 2, (int[]){2, 4}, TOFU_FLOAT);
 
     /* Gamma and beta for scaling/shifting */
     float gamma_data[] = {1.0f, 1.0f, 1.0f, 1.0f};
     float beta_data[] = {0.0f, 0.0f, 0.0f, 0.0f};
-    tl_tensor* gamma = tl_tensor_create(gamma_data, 1, (int[]){4}, TL_FLOAT);
-    tl_tensor* beta = tl_tensor_create(beta_data, 1, (int[]){4}, TL_FLOAT);
+    tofu_tensor* gamma = tofu_tensor_create(gamma_data, 1, (int[]){4}, TOFU_FLOAT);
+    tofu_tensor* beta = tofu_tensor_create(beta_data, 1, (int[]){4}, TOFU_FLOAT);
 
     /* Layer norm along axis 1 */
-    tl_tensor* normed = tl_tensor_layer_norm(t, NULL, gamma, beta, 1, 1e-5);
+    tofu_tensor* normed = tofu_tensor_layer_norm(t, NULL, gamma, beta, 1, 1e-5);
 
     /* Check that each row has mean ≈ 0 and std ≈ 1 */
     for (int row = 0; row < 2; row++) {
         float sum = 0.0f;
         for (int col = 0; col < 4; col++) {
             float val;
-            TL_TENSOR_DATA_TO(normed, row * 4 + col, val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(normed, row * 4 + col, val, TOFU_FLOAT);
             sum += val;
         }
         float mean = sum / 4.0f;
@@ -139,7 +139,7 @@ int test_layer_norm() {
         float var_sum = 0.0f;
         for (int col = 0; col < 4; col++) {
             float val;
-            TL_TENSOR_DATA_TO(normed, row * 4 + col, val, TL_FLOAT);
+            TOFU_TENSOR_DATA_TO(normed, row * 4 + col, val, TOFU_FLOAT);
             var_sum += val * val;
         }
         float std = sqrtf(var_sum / 4.0f);
@@ -150,10 +150,10 @@ int test_layer_norm() {
         }
     }
 
-    tl_tensor_free(t);  /* t uses stack data */
-    tl_tensor_free(gamma);  /* gamma uses stack data */
-    tl_tensor_free(beta);  /* beta uses stack data */
-    tl_tensor_free_data_too(normed);
+    tofu_tensor_free(t);  /* t uses stack data */
+    tofu_tensor_free(gamma);  /* gamma uses stack data */
+    tofu_tensor_free(beta);  /* beta uses stack data */
+    tofu_tensor_free_data_too(normed);
     printf("  ✓ PASSED\n\n");
     return 1;
 }

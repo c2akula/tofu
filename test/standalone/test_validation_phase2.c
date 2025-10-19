@@ -13,9 +13,9 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
-#include "tl_graph.h"
-#include "tl_tensor.h"
-#include "tl_optimizer.h"
+#include "tofu_graph.h"
+#include "tofu_tensor.h"
+#include "tofu_optimizer.h"
 
 /* ====================================================================
  * HELPER FUNCTIONS FOR TESTING
@@ -25,7 +25,7 @@
  * Compute L2 norm of gradient tensor
  * Returns: sqrt(sum of squared gradient values)
  */
-static float compute_gradient_magnitude(tl_graph_node* node) {
+static float compute_gradient_magnitude(tofu_graph_node* node) {
     if (node == NULL || node->grad == NULL) {
         return 0.0f;
     }
@@ -33,7 +33,7 @@ static float compute_gradient_magnitude(tl_graph_node* node) {
     float sum_sq = 0.0f;
     for (int i = 0; i < node->grad->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(node->grad, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(node->grad, i, val, TOFU_FLOAT);
         sum_sq += val * val;
     }
 
@@ -52,7 +52,7 @@ static int is_invalid_value(float val) {
  * Check if all node gradients are in healthy range [min_threshold, max_threshold]
  * Returns: 1 if healthy, 0 if any gradient is out of range
  */
-static int check_gradient_health(tl_graph_node** nodes, int num_nodes,
+static int check_gradient_health(tofu_graph_node** nodes, int num_nodes,
                                  float min_threshold, float max_threshold) {
     for (int i = 0; i < num_nodes; i++) {
         if (nodes[i] == NULL) {
@@ -138,26 +138,26 @@ static void test_helper_gradient_magnitude() {
     printf("  Test 1: NULL node returns 0.0f - PASSED\n");
 
     /* Test 2: Node with NULL gradient */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     float data[] = {1.0f, 2.0f, 3.0f};
-    tl_tensor* t = tl_tensor_create(data, 1, (int[]){3}, TL_FLOAT);
-    tl_graph_node* node = tl_graph_input(g, t);
+    tofu_tensor* t = tofu_tensor_create(data, 1, (int[]){3}, TOFU_FLOAT);
+    tofu_graph_node* node = tofu_graph_input(g, t);
     float mag2 = compute_gradient_magnitude(node);
     assert(mag2 == 0.0f);
     printf("  Test 2: Node with NULL gradient returns 0.0f - PASSED\n");
 
     /* Test 3: Node with gradient [3, 4] -> L2 norm = 5.0 */
     float grad_data[] = {3.0f, 4.0f};
-    node->grad = tl_tensor_create(grad_data, 1, (int[]){2}, TL_FLOAT);
+    node->grad = tofu_tensor_create(grad_data, 1, (int[]){2}, TOFU_FLOAT);
     float mag3 = compute_gradient_magnitude(node);
     assert(fabsf(mag3 - 5.0f) < 1e-5f);
     printf("  Test 3: Gradient [3, 4] L2 norm = %.1f (expected 5.0) - PASSED\n", mag3);
 
     /* Cleanup */
-    tl_tensor_free(node->grad);
+    tofu_tensor_free(node->grad);
     node->grad = NULL;
-    tl_tensor_free(t);
-    tl_graph_free(g);
+    tofu_tensor_free(t);
+    tofu_graph_free(g);
 }
 
 /*
@@ -191,7 +191,7 @@ static void test_helper_gradient_health() {
     printf("-----------------------------------\n");
 
     /* Create synthetic nodes for testing */
-    tl_graph_node* nodes[3];
+    tofu_graph_node* nodes[3];
 
     /* We'll just test the helper without creating full graphs to avoid cleanup issues */
     /* Test with mock gradient computations instead */
@@ -337,50 +337,50 @@ static void test_residual_single_block(void) {
     srand(42);
 
     /* Test setup: Create graph and input tensor */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     assert(g != NULL);
 
     float input_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    tl_tensor* input = tl_tensor_create(input_data, 2, (int[]){1, 4}, TL_FLOAT);
+    tofu_tensor* input = tofu_tensor_create(input_data, 2, (int[]){1, 4}, TOFU_FLOAT);
     assert(input != NULL);
 
-    tl_graph_node* input_node = tl_graph_input(g, input);
+    tofu_graph_node* input_node = tofu_graph_input(g, input);
     assert(input_node != NULL);
 
     /* Build residual block: Linear(4→8) */
     float* w1_data = (float*)malloc(4 * 8 * sizeof(float));
     assert(w1_data != NULL);
     init_weights_xavier(w1_data, 4, 8);
-    tl_tensor* w1_tensor = tl_tensor_create(w1_data, 2, (int[]){4, 8}, TL_FLOAT);
+    tofu_tensor* w1_tensor = tofu_tensor_create(w1_data, 2, (int[]){4, 8}, TOFU_FLOAT);
     assert(w1_tensor != NULL);
 
-    tl_graph_node* w1_node = tl_graph_param(g, w1_tensor);
+    tofu_graph_node* w1_node = tofu_graph_param(g, w1_tensor);
     assert(w1_node != NULL);
     w1_node->requires_grad = 1;
 
-    tl_graph_node* matmul1 = tl_graph_matmul(g, input_node, w1_node);
+    tofu_graph_node* matmul1 = tofu_graph_matmul(g, input_node, w1_node);
     assert(matmul1 != NULL);
 
     /* ReLU activation */
-    tl_graph_node* relu = tl_graph_relu(g, matmul1);
+    tofu_graph_node* relu = tofu_graph_relu(g, matmul1);
     assert(relu != NULL);
 
     /* Linear(8→4) */
     float* w2_data = (float*)malloc(8 * 4 * sizeof(float));
     assert(w2_data != NULL);
     init_weights_xavier(w2_data, 8, 4);
-    tl_tensor* w2_tensor = tl_tensor_create(w2_data, 2, (int[]){8, 4}, TL_FLOAT);
+    tofu_tensor* w2_tensor = tofu_tensor_create(w2_data, 2, (int[]){8, 4}, TOFU_FLOAT);
     assert(w2_tensor != NULL);
 
-    tl_graph_node* w2_node = tl_graph_param(g, w2_tensor);
+    tofu_graph_node* w2_node = tofu_graph_param(g, w2_tensor);
     assert(w2_node != NULL);
     w2_node->requires_grad = 1;
 
-    tl_graph_node* matmul2 = tl_graph_matmul(g, relu, w2_node);
+    tofu_graph_node* matmul2 = tofu_graph_matmul(g, relu, w2_node);
     assert(matmul2 != NULL);
 
     /* Skip connection: add input to output */
-    tl_graph_node* output = tl_graph_add(g, matmul2, input_node);
+    tofu_graph_node* output = tofu_graph_add(g, matmul2, input_node);
     assert(output != NULL);
 
     /* Forward pass is implicit with graph building */
@@ -392,11 +392,11 @@ static void test_residual_single_block(void) {
     for (int i = 0; i < output->value->len; i++) {
         grad_data[i] = 1.0f;
     }
-    output->grad = tl_tensor_create(grad_data, output->value->ndim, output->value->dims, TL_FLOAT);
+    output->grad = tofu_tensor_create(grad_data, output->value->ndim, output->value->dims, TOFU_FLOAT);
     assert(output->grad != NULL);
 
     /* Backward pass */
-    tl_graph_backward(g, output);
+    tofu_graph_backward(g, output);
 
     /* Assertions */
 
@@ -404,7 +404,7 @@ static void test_residual_single_block(void) {
     int output_valid = 1;
     for (int i = 0; i < output->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(output->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output->value, i, val, TOFU_FLOAT);
         if (is_invalid_value(val)) {
             output_valid = 0;
             break;
@@ -427,18 +427,18 @@ static void test_residual_single_block(void) {
     printf("  ✓ W2 gradient magnitude: %.6f (> 0)\n", mag_w2);
 
     /* 4. Check gradient health (in expected range) */
-    tl_graph_node* weight_nodes[] = {w1_node, w2_node};
+    tofu_graph_node* weight_nodes[] = {w1_node, w2_node};
     int healthy = check_gradient_health(weight_nodes, 2, 1e-6f, 1e2f);
     assert(healthy);
     printf("  ✓ Gradient magnitudes are healthy [1e-6, 1e2]\n");
 
     /* Cleanup */
-    tl_tensor_free(output->grad);
+    tofu_tensor_free(output->grad);
     output->grad = NULL;
-    tl_tensor_free(input);
-    tl_tensor_free(w1_tensor);
-    tl_tensor_free(w2_tensor);
-    tl_graph_free(g);
+    tofu_tensor_free(input);
+    tofu_tensor_free(w1_tensor);
+    tofu_tensor_free(w2_tensor);
+    tofu_graph_free(g);
 
     printf("  PASSED\n");
 }
@@ -451,19 +451,19 @@ static void test_residual_stacked_blocks(void) {
     srand(43);
 
     /* Test setup: Create graph and input tensor */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     assert(g != NULL);
 
     float input_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    tl_tensor* input = tl_tensor_create(input_data, 2, (int[]){1, 4}, TL_FLOAT);
+    tofu_tensor* input = tofu_tensor_create(input_data, 2, (int[]){1, 4}, TOFU_FLOAT);
     assert(input != NULL);
 
-    tl_graph_node* input_node = tl_graph_input(g, input);
+    tofu_graph_node* input_node = tofu_graph_input(g, input);
     assert(input_node != NULL);
 
     /* Build 3 stacked residual blocks */
-    tl_graph_node* current = input_node;
-    tl_graph_node* weight_nodes[6];
+    tofu_graph_node* current = input_node;
+    tofu_graph_node* weight_nodes[6];
     int weight_count = 0;
 
     for (int block = 0; block < 3; block++) {
@@ -471,42 +471,42 @@ static void test_residual_stacked_blocks(void) {
         float* w1_data = (float*)malloc(4 * 8 * sizeof(float));
         assert(w1_data != NULL);
         init_weights_xavier(w1_data, 4, 8);
-        tl_tensor* w1_tensor = tl_tensor_create(w1_data, 2, (int[]){4, 8}, TL_FLOAT);
+        tofu_tensor* w1_tensor = tofu_tensor_create(w1_data, 2, (int[]){4, 8}, TOFU_FLOAT);
         assert(w1_tensor != NULL);
 
-        tl_graph_node* w1_node = tl_graph_param(g, w1_tensor);
+        tofu_graph_node* w1_node = tofu_graph_param(g, w1_tensor);
         assert(w1_node != NULL);
         w1_node->requires_grad = 1;
         weight_nodes[weight_count++] = w1_node;
 
-        tl_graph_node* matmul1 = tl_graph_matmul(g, current, w1_node);
+        tofu_graph_node* matmul1 = tofu_graph_matmul(g, current, w1_node);
         assert(matmul1 != NULL);
 
         /* ReLU activation */
-        tl_graph_node* relu = tl_graph_relu(g, matmul1);
+        tofu_graph_node* relu = tofu_graph_relu(g, matmul1);
         assert(relu != NULL);
 
         /* Linear(8→4) */
         float* w2_data = (float*)malloc(8 * 4 * sizeof(float));
         assert(w2_data != NULL);
         init_weights_xavier(w2_data, 8, 4);
-        tl_tensor* w2_tensor = tl_tensor_create(w2_data, 2, (int[]){8, 4}, TL_FLOAT);
+        tofu_tensor* w2_tensor = tofu_tensor_create(w2_data, 2, (int[]){8, 4}, TOFU_FLOAT);
         assert(w2_tensor != NULL);
 
-        tl_graph_node* w2_node = tl_graph_param(g, w2_tensor);
+        tofu_graph_node* w2_node = tofu_graph_param(g, w2_tensor);
         assert(w2_node != NULL);
         w2_node->requires_grad = 1;
         weight_nodes[weight_count++] = w2_node;
 
-        tl_graph_node* matmul2 = tl_graph_matmul(g, relu, w2_node);
+        tofu_graph_node* matmul2 = tofu_graph_matmul(g, relu, w2_node);
         assert(matmul2 != NULL);
 
         /* Skip connection */
-        current = tl_graph_add(g, matmul2, current);
+        current = tofu_graph_add(g, matmul2, current);
         assert(current != NULL);
     }
 
-    tl_graph_node* output = current;
+    tofu_graph_node* output = current;
 
     /* Set output gradient to all ones for backward pass */
     assert(output->value != NULL);
@@ -515,11 +515,11 @@ static void test_residual_stacked_blocks(void) {
     for (int i = 0; i < output->value->len; i++) {
         grad_data[i] = 1.0f;
     }
-    output->grad = tl_tensor_create(grad_data, output->value->ndim, output->value->dims, TL_FLOAT);
+    output->grad = tofu_tensor_create(grad_data, output->value->ndim, output->value->dims, TOFU_FLOAT);
     assert(output->grad != NULL);
 
     /* Backward pass */
-    tl_graph_backward(g, output);
+    tofu_graph_backward(g, output);
 
     /* Assertions */
 
@@ -527,7 +527,7 @@ static void test_residual_stacked_blocks(void) {
     int output_valid = 1;
     for (int i = 0; i < output->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(output->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output->value, i, val, TOFU_FLOAT);
         if (is_invalid_value(val)) {
             output_valid = 0;
             break;
@@ -567,19 +567,19 @@ static void test_residual_stacked_blocks(void) {
     printf("  ✓ All gradients are valid (no NaN/Inf)\n");
 
     /* Cleanup */
-    tl_tensor_free(output->grad);
+    tofu_tensor_free(output->grad);
     output->grad = NULL;
-    tl_tensor_free(input);
+    tofu_tensor_free(input);
 
     /* Free all weight tensors */
     for (int i = 0; i < 6; i++) {
         if (weight_nodes[i] != NULL && weight_nodes[i]->value != NULL) {
-            tl_tensor_free(weight_nodes[i]->value);
+            tofu_tensor_free(weight_nodes[i]->value);
             weight_nodes[i]->value = NULL;
         }
     }
 
-    tl_graph_free(g);
+    tofu_graph_free(g);
 
     printf("  PASSED\n");
 }
@@ -594,50 +594,50 @@ static void test_residual_gradient_comparison(void) {
 
     /* Input tensor (shared) */
     float input_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
-    tl_tensor* input = tl_tensor_create(input_data, 2, (int[]){1, 4}, TL_FLOAT);
+    tofu_tensor* input = tofu_tensor_create(input_data, 2, (int[]){1, 4}, TOFU_FLOAT);
     assert(input != NULL);
 
     /* ===== Network A: With Skip Connection (Residual) ===== */
-    tl_graph* g_a = tl_graph_create();
+    tofu_graph* g_a = tofu_graph_create();
     assert(g_a != NULL);
 
-    tl_graph_node* input_a = tl_graph_input(g_a, input);
+    tofu_graph_node* input_a = tofu_graph_input(g_a, input);
     assert(input_a != NULL);
 
     /* Linear(4→8) */
     float* w1a_data = (float*)malloc(4 * 8 * sizeof(float));
     assert(w1a_data != NULL);
     init_weights_xavier(w1a_data, 4, 8);
-    tl_tensor* w1a_tensor = tl_tensor_create(w1a_data, 2, (int[]){4, 8}, TL_FLOAT);
+    tofu_tensor* w1a_tensor = tofu_tensor_create(w1a_data, 2, (int[]){4, 8}, TOFU_FLOAT);
     assert(w1a_tensor != NULL);
 
-    tl_graph_node* w1a_node = tl_graph_param(g_a, w1a_tensor);
+    tofu_graph_node* w1a_node = tofu_graph_param(g_a, w1a_tensor);
     assert(w1a_node != NULL);
     w1a_node->requires_grad = 1;
 
-    tl_graph_node* matmul1a = tl_graph_matmul(g_a, input_a, w1a_node);
+    tofu_graph_node* matmul1a = tofu_graph_matmul(g_a, input_a, w1a_node);
     assert(matmul1a != NULL);
 
     /* ReLU */
-    tl_graph_node* relua = tl_graph_relu(g_a, matmul1a);
+    tofu_graph_node* relua = tofu_graph_relu(g_a, matmul1a);
     assert(relua != NULL);
 
     /* Linear(8→4) */
     float* w2a_data = (float*)malloc(8 * 4 * sizeof(float));
     assert(w2a_data != NULL);
     init_weights_xavier(w2a_data, 8, 4);
-    tl_tensor* w2a_tensor = tl_tensor_create(w2a_data, 2, (int[]){8, 4}, TL_FLOAT);
+    tofu_tensor* w2a_tensor = tofu_tensor_create(w2a_data, 2, (int[]){8, 4}, TOFU_FLOAT);
     assert(w2a_tensor != NULL);
 
-    tl_graph_node* w2a_node = tl_graph_param(g_a, w2a_tensor);
+    tofu_graph_node* w2a_node = tofu_graph_param(g_a, w2a_tensor);
     assert(w2a_node != NULL);
     w2a_node->requires_grad = 1;
 
-    tl_graph_node* matmul2a = tl_graph_matmul(g_a, relua, w2a_node);
+    tofu_graph_node* matmul2a = tofu_graph_matmul(g_a, relua, w2a_node);
     assert(matmul2a != NULL);
 
     /* Skip connection */
-    tl_graph_node* output_a = tl_graph_add(g_a, matmul2a, input_a);
+    tofu_graph_node* output_a = tofu_graph_add(g_a, matmul2a, input_a);
     assert(output_a != NULL);
 
     /* Set gradient for A and backward */
@@ -647,52 +647,52 @@ static void test_residual_gradient_comparison(void) {
     for (int i = 0; i < output_a->value->len; i++) {
         grad_a_data[i] = 1.0f;
     }
-    output_a->grad = tl_tensor_create(grad_a_data, output_a->value->ndim, output_a->value->dims, TL_FLOAT);
+    output_a->grad = tofu_tensor_create(grad_a_data, output_a->value->ndim, output_a->value->dims, TOFU_FLOAT);
     assert(output_a->grad != NULL);
 
-    tl_graph_backward(g_a, output_a);
+    tofu_graph_backward(g_a, output_a);
 
     /* ===== Network B: Without Skip Connection (Standard) ===== */
-    tl_graph* g_b = tl_graph_create();
+    tofu_graph* g_b = tofu_graph_create();
     assert(g_b != NULL);
 
     /* Create fresh input for B */
-    tl_tensor* input_b_copy = tl_tensor_clone(input);
+    tofu_tensor* input_b_copy = tofu_tensor_clone(input);
     assert(input_b_copy != NULL);
 
-    tl_graph_node* input_b = tl_graph_input(g_b, input_b_copy);
+    tofu_graph_node* input_b = tofu_graph_input(g_b, input_b_copy);
     assert(input_b != NULL);
 
     /* Linear(4→8) - same weights as network A */
     float* w1b_data = (float*)malloc(4 * 8 * sizeof(float));
     assert(w1b_data != NULL);
     memcpy(w1b_data, w1a_data, 4 * 8 * sizeof(float));  /* Use same initialization */
-    tl_tensor* w1b_tensor = tl_tensor_create(w1b_data, 2, (int[]){4, 8}, TL_FLOAT);
+    tofu_tensor* w1b_tensor = tofu_tensor_create(w1b_data, 2, (int[]){4, 8}, TOFU_FLOAT);
     assert(w1b_tensor != NULL);
 
-    tl_graph_node* w1b_node = tl_graph_param(g_b, w1b_tensor);
+    tofu_graph_node* w1b_node = tofu_graph_param(g_b, w1b_tensor);
     assert(w1b_node != NULL);
     w1b_node->requires_grad = 1;
 
-    tl_graph_node* matmul1b = tl_graph_matmul(g_b, input_b, w1b_node);
+    tofu_graph_node* matmul1b = tofu_graph_matmul(g_b, input_b, w1b_node);
     assert(matmul1b != NULL);
 
     /* ReLU */
-    tl_graph_node* relub = tl_graph_relu(g_b, matmul1b);
+    tofu_graph_node* relub = tofu_graph_relu(g_b, matmul1b);
     assert(relub != NULL);
 
     /* Linear(8→4) - same weights as network A */
     float* w2b_data = (float*)malloc(8 * 4 * sizeof(float));
     assert(w2b_data != NULL);
     memcpy(w2b_data, w2a_data, 8 * 4 * sizeof(float));  /* Use same initialization */
-    tl_tensor* w2b_tensor = tl_tensor_create(w2b_data, 2, (int[]){8, 4}, TL_FLOAT);
+    tofu_tensor* w2b_tensor = tofu_tensor_create(w2b_data, 2, (int[]){8, 4}, TOFU_FLOAT);
     assert(w2b_tensor != NULL);
 
-    tl_graph_node* w2b_node = tl_graph_param(g_b, w2b_tensor);
+    tofu_graph_node* w2b_node = tofu_graph_param(g_b, w2b_tensor);
     assert(w2b_node != NULL);
     w2b_node->requires_grad = 1;
 
-    tl_graph_node* output_b = tl_graph_matmul(g_b, relub, w2b_node);
+    tofu_graph_node* output_b = tofu_graph_matmul(g_b, relub, w2b_node);
     assert(output_b != NULL);
 
     /* Set gradient for B and backward */
@@ -702,10 +702,10 @@ static void test_residual_gradient_comparison(void) {
     for (int i = 0; i < output_b->value->len; i++) {
         grad_b_data[i] = 1.0f;
     }
-    output_b->grad = tl_tensor_create(grad_b_data, output_b->value->ndim, output_b->value->dims, TL_FLOAT);
+    output_b->grad = tofu_tensor_create(grad_b_data, output_b->value->ndim, output_b->value->dims, TOFU_FLOAT);
     assert(output_b->grad != NULL);
 
-    tl_graph_backward(g_b, output_b);
+    tofu_graph_backward(g_b, output_b);
 
     /* Assertions */
 
@@ -713,7 +713,7 @@ static void test_residual_gradient_comparison(void) {
     int a_valid = 1, b_valid = 1;
     for (int i = 0; i < output_a->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(output_a->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output_a->value, i, val, TOFU_FLOAT);
         if (is_invalid_value(val)) {
             a_valid = 0;
             break;
@@ -721,7 +721,7 @@ static void test_residual_gradient_comparison(void) {
     }
     for (int i = 0; i < output_b->value->len; i++) {
         float val;
-        TL_TENSOR_DATA_TO(output_b->value, i, val, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output_b->value, i, val, TOFU_FLOAT);
         if (is_invalid_value(val)) {
             b_valid = 0;
             break;
@@ -753,22 +753,22 @@ static void test_residual_gradient_comparison(void) {
     printf("  ✓ Residual network maintains healthy gradient flow (ratio >= 0.8)\n");
 
     /* Cleanup A */
-    tl_tensor_free(output_a->grad);
+    tofu_tensor_free(output_a->grad);
     output_a->grad = NULL;
-    tl_tensor_free(w1a_tensor);
-    tl_tensor_free(w2a_tensor);
-    tl_graph_free(g_a);
+    tofu_tensor_free(w1a_tensor);
+    tofu_tensor_free(w2a_tensor);
+    tofu_graph_free(g_a);
 
     /* Cleanup B */
-    tl_tensor_free(output_b->grad);
+    tofu_tensor_free(output_b->grad);
     output_b->grad = NULL;
-    tl_tensor_free(input_b_copy);
-    tl_tensor_free(w1b_tensor);
-    tl_tensor_free(w2b_tensor);
-    tl_graph_free(g_b);
+    tofu_tensor_free(input_b_copy);
+    tofu_tensor_free(w1b_tensor);
+    tofu_tensor_free(w2b_tensor);
+    tofu_graph_free(g_b);
 
     /* Cleanup shared input */
-    tl_tensor_free(input);
+    tofu_tensor_free(input);
 
     printf("  PASSED\n");
 }
@@ -780,49 +780,49 @@ static void test_deep_network_10_layers(void) {
     srand(42);
 
     /* Create graph and input tensor [1, 4] */
-    tl_graph* g = tl_graph_create();
+    tofu_graph* g = tofu_graph_create();
     assert(g != NULL);
 
     float input_data[] = {0.5f, 0.6f, 0.7f, 0.8f};
-    tl_tensor* input_tensor = tl_tensor_create(input_data, 2, (int[]){1, 4}, TL_FLOAT);
+    tofu_tensor* input_tensor = tofu_tensor_create(input_data, 2, (int[]){1, 4}, TOFU_FLOAT);
     assert(input_tensor != NULL);
-    tl_graph_node* x = tl_graph_input(g, input_tensor);
+    tofu_graph_node* x = tofu_graph_input(g, input_tensor);
     assert(x != NULL);
 
     /* Layer 1: [1, 4] -> [1, 8] */
     float* w1_data = (float*)malloc(4 * 8 * sizeof(float));
     assert(w1_data != NULL);
     init_weights_xavier(w1_data, 4, 8);
-    tl_tensor* w1_tensor = tl_tensor_create(w1_data, 2, (int[]){4, 8}, TL_FLOAT);
+    tofu_tensor* w1_tensor = tofu_tensor_create(w1_data, 2, (int[]){4, 8}, TOFU_FLOAT);
     assert(w1_tensor != NULL);
-    tl_graph_node* w1 = tl_graph_param(g, w1_tensor);
+    tofu_graph_node* w1 = tofu_graph_param(g, w1_tensor);
     assert(w1 != NULL);
     w1->requires_grad = 1;
 
-    tl_graph_node* z1 = tl_graph_matmul(g, x, w1);
+    tofu_graph_node* z1 = tofu_graph_matmul(g, x, w1);
     assert(z1 != NULL);
-    tl_graph_node* a1 = tl_graph_relu(g, z1);
+    tofu_graph_node* a1 = tofu_graph_relu(g, z1);
     assert(a1 != NULL);
 
     /* Layers 2-9: [1, 8] -> [1, 8] */
-    tl_graph_node* weight_nodes[10];
+    tofu_graph_node* weight_nodes[10];
     weight_nodes[0] = w1;
 
-    tl_graph_node* a_prev = a1;
+    tofu_graph_node* a_prev = a1;
     for (int i = 2; i <= 9; i++) {
         float* wi_data = (float*)malloc(8 * 8 * sizeof(float));
         assert(wi_data != NULL);
         init_weights_xavier(wi_data, 8, 8);
-        tl_tensor* wi_tensor = tl_tensor_create(wi_data, 2, (int[]){8, 8}, TL_FLOAT);
+        tofu_tensor* wi_tensor = tofu_tensor_create(wi_data, 2, (int[]){8, 8}, TOFU_FLOAT);
         assert(wi_tensor != NULL);
-        tl_graph_node* wi = tl_graph_param(g, wi_tensor);
+        tofu_graph_node* wi = tofu_graph_param(g, wi_tensor);
         assert(wi != NULL);
         wi->requires_grad = 1;
         weight_nodes[i - 1] = wi;
 
-        tl_graph_node* zi = tl_graph_matmul(g, a_prev, wi);
+        tofu_graph_node* zi = tofu_graph_matmul(g, a_prev, wi);
         assert(zi != NULL);
-        a_prev = tl_graph_relu(g, zi);
+        a_prev = tofu_graph_relu(g, zi);
         assert(a_prev != NULL);
     }
 
@@ -830,14 +830,14 @@ static void test_deep_network_10_layers(void) {
     float* w10_data = (float*)malloc(8 * 2 * sizeof(float));
     assert(w10_data != NULL);
     init_weights_xavier(w10_data, 8, 2);
-    tl_tensor* w10_tensor = tl_tensor_create(w10_data, 2, (int[]){8, 2}, TL_FLOAT);
+    tofu_tensor* w10_tensor = tofu_tensor_create(w10_data, 2, (int[]){8, 2}, TOFU_FLOAT);
     assert(w10_tensor != NULL);
-    tl_graph_node* w10 = tl_graph_param(g, w10_tensor);
+    tofu_graph_node* w10 = tofu_graph_param(g, w10_tensor);
     assert(w10 != NULL);
     w10->requires_grad = 1;
     weight_nodes[9] = w10;
 
-    tl_graph_node* output = tl_graph_matmul(g, a_prev, w10);
+    tofu_graph_node* output = tofu_graph_matmul(g, a_prev, w10);
     assert(output != NULL);
 
     /* Set gradient on output to all ones */
@@ -846,11 +846,11 @@ static void test_deep_network_10_layers(void) {
     for (int i = 0; i < output->value->len; i++) {
         output_grad_data[i] = 1.0f;
     }
-    output->grad = tl_tensor_create(output_grad_data, output->value->ndim, output->value->dims, TL_FLOAT);
+    output->grad = tofu_tensor_create(output_grad_data, output->value->ndim, output->value->dims, TOFU_FLOAT);
     assert(output->grad != NULL);
 
     /* Backward pass */
-    tl_graph_backward(g, output);
+    tofu_graph_backward(g, output);
 
     /* Compute gradient magnitudes */
     float layer1_grad = compute_gradient_magnitude(weight_nodes[0]);
@@ -909,10 +909,10 @@ static void test_deep_network_10_layers(void) {
     printf("  ✓ Gradient magnitudes remain within reasonable ratio (%.1e)\n", ratio);
 
     /* Cleanup */
-    tl_tensor_free(input_tensor);
-    tl_tensor_free(output->grad);
+    tofu_tensor_free(input_tensor);
+    tofu_tensor_free(output->grad);
     output->grad = NULL;
-    tl_graph_free(g);
+    tofu_graph_free(g);
 
     printf("  PASSED\n");
 }
@@ -957,7 +957,7 @@ static void test_gradient_magnitude_tracking(void) {
 
     for (int iteration = 0; iteration < 10; iteration++) {
         /* Create fresh graph for each iteration */
-        tl_graph* g = tl_graph_create();
+        tofu_graph* g = tofu_graph_create();
         assert(g != NULL);
 
         /* Create input: take first sample */
@@ -967,97 +967,97 @@ static void test_gradient_magnitude_tracking(void) {
             sample_data[j] = X[j];
         }
 
-        tl_tensor* input_tensor = tl_tensor_create(sample_data, 2, (int[]){1, 4}, TL_FLOAT);
+        tofu_tensor* input_tensor = tofu_tensor_create(sample_data, 2, (int[]){1, 4}, TOFU_FLOAT);
         assert(input_tensor != NULL);
-        tl_graph_node* x = tl_graph_input(g, input_tensor);
+        tofu_graph_node* x = tofu_graph_input(g, input_tensor);
         assert(x != NULL);
 
         /* Create weight tensors that reference the shared data */
-        tl_tensor* w1_tensor = tl_tensor_create(w1_data, 2, (int[]){4, 8}, TL_FLOAT);
+        tofu_tensor* w1_tensor = tofu_tensor_create(w1_data, 2, (int[]){4, 8}, TOFU_FLOAT);
         assert(w1_tensor != NULL);
-        tl_graph_node* w1 = tl_graph_param(g, w1_tensor);
+        tofu_graph_node* w1 = tofu_graph_param(g, w1_tensor);
         assert(w1 != NULL);
         w1->requires_grad = 1;
 
-        tl_graph_node* z1 = tl_graph_matmul(g, x, w1);
+        tofu_graph_node* z1 = tofu_graph_matmul(g, x, w1);
         assert(z1 != NULL);
-        tl_graph_node* a1 = tl_graph_relu(g, z1);
+        tofu_graph_node* a1 = tofu_graph_relu(g, z1);
         assert(a1 != NULL);
 
         /* Store weight nodes for gradient tracking */
-        tl_graph_node* weight_nodes[6];
+        tofu_graph_node* weight_nodes[6];
         weight_nodes[0] = w1;
 
         /* Layers 2-5: [1, 8] -> [1, 8] with ReLU */
-        tl_tensor* w_tensors[6];
+        tofu_tensor* w_tensors[6];
         w_tensors[0] = w1_tensor;
 
         /* Layer 2 */
-        tl_tensor* w2_tensor = tl_tensor_create(w2_data, 2, (int[]){8, 8}, TL_FLOAT);
+        tofu_tensor* w2_tensor = tofu_tensor_create(w2_data, 2, (int[]){8, 8}, TOFU_FLOAT);
         assert(w2_tensor != NULL);
-        tl_graph_node* w2 = tl_graph_param(g, w2_tensor);
+        tofu_graph_node* w2 = tofu_graph_param(g, w2_tensor);
         assert(w2 != NULL);
         w2->requires_grad = 1;
         weight_nodes[1] = w2;
         w_tensors[1] = w2_tensor;
 
-        tl_graph_node* z2 = tl_graph_matmul(g, a1, w2);
+        tofu_graph_node* z2 = tofu_graph_matmul(g, a1, w2);
         assert(z2 != NULL);
-        tl_graph_node* a2 = tl_graph_relu(g, z2);
+        tofu_graph_node* a2 = tofu_graph_relu(g, z2);
         assert(a2 != NULL);
 
         /* Layer 3 */
-        tl_tensor* w3_tensor = tl_tensor_create(w3_data, 2, (int[]){8, 8}, TL_FLOAT);
+        tofu_tensor* w3_tensor = tofu_tensor_create(w3_data, 2, (int[]){8, 8}, TOFU_FLOAT);
         assert(w3_tensor != NULL);
-        tl_graph_node* w3 = tl_graph_param(g, w3_tensor);
+        tofu_graph_node* w3 = tofu_graph_param(g, w3_tensor);
         assert(w3 != NULL);
         w3->requires_grad = 1;
         weight_nodes[2] = w3;
         w_tensors[2] = w3_tensor;
 
-        tl_graph_node* z3 = tl_graph_matmul(g, a2, w3);
+        tofu_graph_node* z3 = tofu_graph_matmul(g, a2, w3);
         assert(z3 != NULL);
-        tl_graph_node* a3 = tl_graph_relu(g, z3);
+        tofu_graph_node* a3 = tofu_graph_relu(g, z3);
         assert(a3 != NULL);
 
         /* Layer 4 */
-        tl_tensor* w4_tensor = tl_tensor_create(w4_data, 2, (int[]){8, 8}, TL_FLOAT);
+        tofu_tensor* w4_tensor = tofu_tensor_create(w4_data, 2, (int[]){8, 8}, TOFU_FLOAT);
         assert(w4_tensor != NULL);
-        tl_graph_node* w4 = tl_graph_param(g, w4_tensor);
+        tofu_graph_node* w4 = tofu_graph_param(g, w4_tensor);
         assert(w4 != NULL);
         w4->requires_grad = 1;
         weight_nodes[3] = w4;
         w_tensors[3] = w4_tensor;
 
-        tl_graph_node* z4 = tl_graph_matmul(g, a3, w4);
+        tofu_graph_node* z4 = tofu_graph_matmul(g, a3, w4);
         assert(z4 != NULL);
-        tl_graph_node* a4 = tl_graph_relu(g, z4);
+        tofu_graph_node* a4 = tofu_graph_relu(g, z4);
         assert(a4 != NULL);
 
         /* Layer 5 */
-        tl_tensor* w5_tensor = tl_tensor_create(w5_data, 2, (int[]){8, 8}, TL_FLOAT);
+        tofu_tensor* w5_tensor = tofu_tensor_create(w5_data, 2, (int[]){8, 8}, TOFU_FLOAT);
         assert(w5_tensor != NULL);
-        tl_graph_node* w5 = tl_graph_param(g, w5_tensor);
+        tofu_graph_node* w5 = tofu_graph_param(g, w5_tensor);
         assert(w5 != NULL);
         w5->requires_grad = 1;
         weight_nodes[4] = w5;
         w_tensors[4] = w5_tensor;
 
-        tl_graph_node* z5 = tl_graph_matmul(g, a4, w5);
+        tofu_graph_node* z5 = tofu_graph_matmul(g, a4, w5);
         assert(z5 != NULL);
-        tl_graph_node* a5 = tl_graph_relu(g, z5);
+        tofu_graph_node* a5 = tofu_graph_relu(g, z5);
         assert(a5 != NULL);
 
         /* Layer 6: [1, 8] -> [1, 2] */
-        tl_tensor* w6_tensor = tl_tensor_create(w6_data, 2, (int[]){8, 2}, TL_FLOAT);
+        tofu_tensor* w6_tensor = tofu_tensor_create(w6_data, 2, (int[]){8, 2}, TOFU_FLOAT);
         assert(w6_tensor != NULL);
-        tl_graph_node* w6 = tl_graph_param(g, w6_tensor);
+        tofu_graph_node* w6 = tofu_graph_param(g, w6_tensor);
         assert(w6 != NULL);
         w6->requires_grad = 1;
         weight_nodes[5] = w6;
         w_tensors[5] = w6_tensor;
 
-        tl_graph_node* output = tl_graph_matmul(g, a5, w6);
+        tofu_graph_node* output = tofu_graph_matmul(g, a5, w6);
         assert(output != NULL);
 
         /* Compute MSE loss: mean of (output[i] - target[i])^2 */
@@ -1072,8 +1072,8 @@ static void test_gradient_magnitude_tracking(void) {
         }
 
         float output_val0, output_val1;
-        TL_TENSOR_DATA_TO(output->value, 0, output_val0, TL_FLOAT);
-        TL_TENSOR_DATA_TO(output->value, 1, output_val1, TL_FLOAT);
+        TOFU_TENSOR_DATA_TO(output->value, 0, output_val0, TOFU_FLOAT);
+        TOFU_TENSOR_DATA_TO(output->value, 1, output_val1, TOFU_FLOAT);
 
         float error0 = output_val0 - target0;
         float error1 = output_val1 - target1;
@@ -1086,11 +1086,11 @@ static void test_gradient_magnitude_tracking(void) {
         output_grad_data[0] = error0;
         output_grad_data[1] = error1;
 
-        output->grad = tl_tensor_create(output_grad_data, output->value->ndim, output->value->dims, TL_FLOAT);
+        output->grad = tofu_tensor_create(output_grad_data, output->value->ndim, output->value->dims, TOFU_FLOAT);
         assert(output->grad != NULL);
 
         /* Backward pass */
-        tl_graph_backward(g, output);
+        tofu_graph_backward(g, output);
 
         /* Track gradient magnitudes for layer 1, layer 3, and layer 6 */
         layer1_grad_history[iteration] = compute_gradient_magnitude(weight_nodes[0]);
@@ -1107,11 +1107,11 @@ static void test_gradient_magnitude_tracking(void) {
         for (int wi = 0; wi < 6; wi++) {
             if (weight_nodes[wi]->grad != NULL) {
                 float* weight_data = (float*)w_tensors[wi]->data;
-                tl_tensor* grad = weight_nodes[wi]->grad;
+                tofu_tensor* grad = weight_nodes[wi]->grad;
 
                 for (int j = 0; j < w_tensors[wi]->len; j++) {
                     float grad_val;
-                    TL_TENSOR_DATA_TO(grad, j, grad_val, TL_FLOAT);
+                    TOFU_TENSOR_DATA_TO(grad, j, grad_val, TOFU_FLOAT);
                     weight_data[j] -= learning_rate * grad_val;
                 }
             }
@@ -1168,10 +1168,10 @@ static void test_gradient_magnitude_tracking(void) {
         }
 
         /* Cleanup graph */
-        tl_tensor_free(input_tensor);
-        tl_tensor_free(output->grad);
+        tofu_tensor_free(input_tensor);
+        tofu_tensor_free(output->grad);
         output->grad = NULL;
-        tl_graph_free(g);
+        tofu_graph_free(g);
 
         free(sample_data);
     }
