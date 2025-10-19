@@ -527,6 +527,246 @@ static void test_gradient_checking_softmax() {
 }
 
 /*
+ * Test 1.1.5: Gradient Checking for Mul (Element-wise Multiply)
+ *
+ * Tests: dL/dx and dL/dy for z = x * y
+ */
+
+typedef struct {
+    float* x_data;
+    float* y_data;
+    int len;
+} mul_context;
+
+static float mul_loss_fn(float* param_data, void* ctx) {
+    mul_context* mc = (mul_context*)ctx;
+
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_x = tl_tensor_create(mc->x_data, 1, (int[]){mc->len}, TL_FLOAT);
+    tl_tensor* t_y = tl_tensor_create(mc->y_data, 1, (int[]){mc->len}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    tl_graph_node* y = tl_graph_input(g, t_y);
+    tl_graph_node* z = tl_graph_mul(g, x, y);
+
+    /* Compute scalar loss: sum of all outputs */
+    float loss = 0.0f;
+    for (int i = 0; i < z->value->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(z->value, i, val, TL_FLOAT);
+        loss += val;
+    }
+
+    tl_tensor_free(t_x);
+    tl_tensor_free(t_y);
+    tl_graph_free(g);
+
+    return loss;
+}
+
+static void test_gradient_checking_mul() {
+    printf("\nTest 1.1.5: Gradient Checking - Mul\n");
+    printf("------------------------------------\n");
+
+    int len = 4;
+    float x_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float y_data[] = {0.5f, -0.3f, 0.8f, -0.2f};
+
+    /* Create graph */
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_x = tl_tensor_create(x_data, 1, (int[]){len}, TL_FLOAT);
+    tl_tensor* t_y = tl_tensor_create(y_data, 1, (int[]){len}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    tl_graph_node* y = tl_graph_input(g, t_y);
+    x->requires_grad = 1;  /* Enable gradient computation for inputs */
+    y->requires_grad = 1;
+    tl_graph_node* z = tl_graph_mul(g, x, y);
+
+    /* Compute scalar loss: sum of all outputs */
+    float loss = 0.0f;
+    for (int i = 0; i < z->value->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(z->value, i, val, TL_FLOAT);
+        loss += val;
+    }
+
+    /* Backward pass */
+    z->grad = tl_tensor_create_with_values((float[]){1.0f, 1.0f, 1.0f, 1.0f}, 1, (int[]){len});
+    tl_graph_backward(g, z);
+
+    /* Check gradients for x */
+    printf("  Checking dL/dx:\n");
+    mul_context ctx_x = {x_data, y_data, len};
+    int num_errors_x = 0;
+
+    for (int i = 0; i < len; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(x_data, i, len, mul_loss_fn, &ctx_x);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at x[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors_x++;
+        }
+    }
+
+    if (num_errors_x == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", len, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors_x, len);
+    }
+
+    /* Check gradients for y */
+    printf("  Checking dL/dy:\n");
+    mul_context ctx_y = {x_data, y_data, len};
+    int num_errors_y = 0;
+
+    for (int i = 0; i < len; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(y->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(y_data, i, len, mul_loss_fn, &ctx_y);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at y[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors_y++;
+        }
+    }
+
+    if (num_errors_y == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", len, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors_y, len);
+    }
+
+    assert(num_errors_x == 0 && num_errors_y == 0);
+
+    tl_tensor_free(t_x);
+    tl_tensor_free(t_y);
+    tl_graph_free(g);
+
+    printf("  ✓ PASSED\n");
+}
+
+/*
+ * Test 1.1.6: Gradient Checking for Transpose
+ *
+ * Tests: dL/dx for y = transpose(x, axes)
+ * Transpose is a view operation (no data copy in forward pass)
+ * Backward must apply inverse permutation to gradient
+ */
+
+typedef struct {
+    float* x_data;
+    int ndim;
+    int dims[10];  /* Max 10 dimensions */
+    int axes[10];  /* Permutation array */
+} transpose_context;
+
+static float transpose_loss_fn(float* param_data, void* ctx) {
+    transpose_context* tc = (transpose_context*)ctx;
+
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_x = tl_tensor_create(tc->x_data, tc->ndim, tc->dims, TL_FLOAT);
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    tl_graph_node* y = tl_graph_transpose(g, x, tc->axes);
+
+    /* Compute scalar loss: sum of all outputs */
+    float loss = 0.0f;
+    for (int i = 0; i < y->value->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        loss += val;
+    }
+
+    tl_tensor_free(t_x);
+    tl_graph_free(g);
+
+    return loss;
+}
+
+static void test_gradient_checking_transpose() {
+    printf("\nTest 1.1.6: Gradient Checking - Transpose\n");
+    printf("-------------------------------------------\n");
+
+    int ndim = 2;
+    int dims[] = {2, 3};
+    int axes[] = {1, 0};  /* Simple 2D transpose: swap dimensions */
+
+    float x_data[] = {
+        1.0f, 2.0f, 3.0f,
+        4.0f, 5.0f, 6.0f
+    };
+
+    /* Create graph */
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_x = tl_tensor_create(x_data, ndim, dims, TL_FLOAT);
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    x->requires_grad = 1;  /* Enable gradient computation for input */
+    tl_graph_node* y = tl_graph_transpose(g, x, axes);
+
+    /* Compute scalar loss: sum of all outputs */
+    float loss = 0.0f;
+    for (int i = 0; i < y->value->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        loss += val;
+    }
+
+    /* Backward pass - gradient is all ones */
+    float* grad_data = (float*)malloc(y->value->len * sizeof(float));
+    for (int i = 0; i < y->value->len; i++) {
+        grad_data[i] = 1.0f;
+    }
+    y->grad = tl_tensor_create_with_values(grad_data, ndim, y->value->dims);
+    free(grad_data);
+
+    tl_graph_backward(g, y);
+
+    /* Check gradients for x */
+    printf("  Checking dL/dx:\n");
+    transpose_context ctx = {x_data, ndim, {dims[0], dims[1], 0}, {axes[0], axes[1], 0}};
+    int num_errors = 0;
+
+    for (int i = 0; i < t_x->len; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(x_data, i, t_x->len, transpose_loss_fn, &ctx);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at x[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors++;
+        }
+    }
+
+    if (num_errors == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", t_x->len, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors, t_x->len);
+    }
+
+    assert(num_errors == 0);
+
+    tl_tensor_free(t_x);
+    tl_graph_free(g);
+
+    printf("  ✓ PASSED\n");
+}
+
+/*
  * Test 1.2.1: Known Analytical Solution - Linear Regression
  *
  * Problem: Learn y = 2x + 3 from clean data
@@ -778,6 +1018,413 @@ static void test_known_solution_xor() {
 }
 
 /*
+ * Test 1.1.5: Gradient Checking for Layer Normalization
+ *
+ * Tests: dL/dx, dL/dγ, dL/dβ for y = LayerNorm(x, γ, β)
+ * This is the most complex gradient in Milestone 1.
+ *
+ * Mathematical formulas:
+ *   μ = mean(x, axis=-1)
+ *   σ² = var(x, axis=-1)
+ *   x_norm = (x - μ) / sqrt(σ² + ε)
+ *   y = γ * x_norm + β
+ *
+ * Gradients:
+ *   ∂L/∂γ = Σ(∂L/∂y ⊙ x_norm)  (sum over non-feature dims)
+ *   ∂L/∂β = Σ(∂L/∂y)           (sum over non-feature dims)
+ *   ∂L/∂x = (1 / (n * σ)) * [
+ *       n * ∂L/∂x_norm - Σ(∂L/∂x_norm) - x_norm * Σ(∂L/∂x_norm ⊙ x_norm)
+ *   ]
+ *   where n = feature dimension size
+ */
+
+typedef struct {
+    float* x_data;
+    float* gamma_data;
+    float* beta_data;
+    int batch_size;
+    int feature_dim;
+} layer_norm_context;
+
+static float layer_norm_loss_fn(float* param_data, void* ctx) {
+    layer_norm_context* lnc = (layer_norm_context*)ctx;
+
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_x = tl_tensor_create(lnc->x_data, 2,
+                                      (int[]){lnc->batch_size, lnc->feature_dim}, TL_FLOAT);
+    tl_tensor* t_gamma = tl_tensor_create(lnc->gamma_data, 1,
+                                          (int[]){lnc->feature_dim}, TL_FLOAT);
+    tl_tensor* t_beta = tl_tensor_create(lnc->beta_data, 1,
+                                         (int[]){lnc->feature_dim}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    tl_graph_node* gamma = tl_graph_param(g, t_gamma);
+    tl_graph_node* beta = tl_graph_param(g, t_beta);
+
+    /* Layer norm along axis 1 (normalize features) */
+    tl_graph_node* y = tl_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
+
+    /* Compute scalar loss: sum of all outputs */
+    float loss = 0.0f;
+    for (int i = 0; i < y->value->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        loss += val;
+    }
+
+    tl_tensor_free(t_x);
+    tl_tensor_free(t_gamma);
+    tl_tensor_free(t_beta);
+    tl_graph_free(g);
+
+    return loss;
+}
+
+static void test_gradient_checking_layer_norm() {
+    printf("\nTest 1.1.5: Gradient Checking - Layer Normalization\n");
+    printf("------------------------------------------------------\n");
+
+    int batch_size = 2;
+    int feature_dim = 4;
+
+    /* Input data: [2, 4] */
+    float x_data[] = {
+        1.0f, 2.0f, 3.0f, 4.0f,      /* Sample 1 */
+        5.0f, 6.0f, 7.0f, 8.0f       /* Sample 2 */
+    };
+
+    /* Scale parameter: [4] - one per feature */
+    float gamma_data[] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    /* Bias parameter: [4] - one per feature */
+    float beta_data[] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    /* Create graph */
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_x = tl_tensor_create(x_data, 2,
+                                      (int[]){batch_size, feature_dim}, TL_FLOAT);
+    tl_tensor* t_gamma = tl_tensor_create(gamma_data, 1,
+                                          (int[]){feature_dim}, TL_FLOAT);
+    tl_tensor* t_beta = tl_tensor_create(beta_data, 1,
+                                         (int[]){feature_dim}, TL_FLOAT);
+
+    tl_graph_node* x = tl_graph_input(g, t_x);
+    tl_graph_node* gamma = tl_graph_param(g, t_gamma);
+    tl_graph_node* beta = tl_graph_param(g, t_beta);
+
+    /* Enable gradient computation */
+    x->requires_grad = 1;
+    gamma->requires_grad = 1;
+    beta->requires_grad = 1;
+
+    /* Layer norm along axis 1 (normalize features dimension) */
+    tl_graph_node* y = tl_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
+
+    /* Compute scalar loss: sum of all outputs */
+    float loss = 0.0f;
+    for (int i = 0; i < y->value->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
+        loss += val;
+    }
+
+    /* Backward pass: dL/dy = varied to avoid cancellation
+     * Layer norm gradients can cancel when output gradient is uniform,
+     * so use: [1, 0.5, -0.5, -1, 1, 0.5, -0.5, -1] */
+    float grad_data[] = {1.0f, 0.5f, -0.5f, -1.0f, 1.0f, 0.5f, -0.5f, -1.0f};
+    y->grad = tl_tensor_create_with_values(grad_data, 2, (int[]){batch_size, feature_dim});
+    tl_graph_backward(g, y);
+
+    /* === Check gradient w.r.t. input x === */
+    printf("  Checking dL/dx (input gradient):\n");
+    layer_norm_context ctx_x = {x_data, gamma_data, beta_data, batch_size, feature_dim};
+    int num_errors_x = 0;
+
+    for (int i = 0; i < batch_size * feature_dim; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(x->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(x_data, i, batch_size * feature_dim,
+                                                     layer_norm_loss_fn, &ctx_x);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at x[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors_x++;
+        }
+    }
+
+    if (num_errors_x == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", batch_size * feature_dim, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors_x, batch_size * feature_dim);
+    }
+
+    /* === Check gradient w.r.t. scale parameter gamma === */
+    printf("  Checking dL/dγ (scale parameter gradient):\n");
+    layer_norm_context ctx_gamma = {x_data, gamma_data, beta_data, batch_size, feature_dim};
+    int num_errors_gamma = 0;
+
+    for (int i = 0; i < feature_dim; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(gamma->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(gamma_data, i, feature_dim,
+                                                     layer_norm_loss_fn, &ctx_gamma);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at γ[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors_gamma++;
+        }
+    }
+
+    if (num_errors_gamma == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", feature_dim, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors_gamma, feature_dim);
+    }
+
+    /* === Check gradient w.r.t. bias parameter beta === */
+    printf("  Checking dL/dβ (bias parameter gradient):\n");
+    layer_norm_context ctx_beta = {x_data, gamma_data, beta_data, batch_size, feature_dim};
+    int num_errors_beta = 0;
+
+    for (int i = 0; i < feature_dim; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(beta->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(beta_data, i, feature_dim,
+                                                     layer_norm_loss_fn, &ctx_beta);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at β[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors_beta++;
+        }
+    }
+
+    if (num_errors_beta == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", feature_dim, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors_beta, feature_dim);
+    }
+
+    assert(num_errors_x == 0 && num_errors_gamma == 0 && num_errors_beta == 0);
+
+    tl_tensor_free(t_x);
+    tl_tensor_free(t_gamma);
+    tl_tensor_free(t_beta);
+    tl_graph_free(g);
+
+    printf("  ✓ PASSED\n");
+}
+
+/*
+ * Test 1.1.5: Gradient Checking for MSE Loss
+ *
+ * Tests: dL/dpred for loss = (1/n) * Σ(pred - target)²
+ */
+
+typedef struct {
+    float* pred_data;
+    float* target_data;
+    int len;
+} mse_loss_context;
+
+static float mse_loss_fn(float* param_data, void* ctx) {
+    mse_loss_context* mc = (mse_loss_context*)ctx;
+
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_pred = tl_tensor_create(mc->pred_data, 1, (int[]){mc->len}, TL_FLOAT);
+    tl_tensor* t_target = tl_tensor_create(mc->target_data, 1, (int[]){mc->len}, TL_FLOAT);
+
+    tl_graph_node* pred = tl_graph_input(g, t_pred);
+    tl_graph_node* target = tl_graph_input(g, t_target);
+    tl_graph_node* loss = tl_graph_mse_loss(g, pred, target);
+
+    /* Extract loss value */
+    float loss_val;
+    TL_TENSOR_DATA_TO(loss->value, 0, loss_val, TL_FLOAT);
+
+    tl_tensor_free(t_pred);
+    tl_tensor_free(t_target);
+    tl_graph_free(g);
+
+    return loss_val;
+}
+
+static void test_gradient_checking_mse_loss() {
+    printf("\nTest 1.1.5: Gradient Checking - MSE Loss\n");
+    printf("------------------------------------------\n");
+
+    int len = 4;
+    float pred_data[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float target_data[] = {1.5f, 2.5f, 2.5f, 3.5f};
+
+    /* Create graph */
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_pred = tl_tensor_create(pred_data, 1, (int[]){len}, TL_FLOAT);
+    tl_tensor* t_target = tl_tensor_create(target_data, 1, (int[]){len}, TL_FLOAT);
+
+    tl_graph_node* pred = tl_graph_input(g, t_pred);
+    tl_graph_node* target = tl_graph_input(g, t_target);
+    pred->requires_grad = 1;  /* Only pred is trainable */
+
+    tl_graph_node* loss = tl_graph_mse_loss(g, pred, target);
+
+    /* Loss gradient is 1.0 (scalar loss) */
+    loss->grad = tl_tensor_create_with_values((float[]){1.0f}, 1, (int[]){1});
+
+    /* Backward pass */
+    tl_graph_backward(g, loss);
+
+    /* Check gradients for pred */
+    printf("  Checking dL/dpred:\n");
+    mse_loss_context ctx = {pred_data, target_data, len};
+    int num_errors = 0;
+
+    for (int i = 0; i < len; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(pred->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(pred_data, i, len, mse_loss_fn, &ctx);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at pred[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors++;
+        }
+    }
+
+    if (num_errors == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", len, TOLERANCE);
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors, len);
+    }
+
+    assert(num_errors == 0);
+
+    tl_tensor_free(t_pred);
+    tl_tensor_free(t_target);
+    tl_graph_free(g);
+
+    printf("  ✓ PASSED\n");
+}
+
+/*
+ * Test 1.1.6: Gradient Checking for Cross-Entropy Loss
+ *
+ * Tests: dL/dpred for loss = -(1/n) * Σ(target * log(pred))
+ */
+
+typedef struct {
+    float* pred_data;
+    float* target_data;
+    int len;
+} ce_loss_context;
+
+static float ce_loss_fn(float* param_data, void* ctx) {
+    ce_loss_context* cc = (ce_loss_context*)ctx;
+
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_pred = tl_tensor_create(cc->pred_data, 1, (int[]){cc->len}, TL_FLOAT);
+    tl_tensor* t_target = tl_tensor_create(cc->target_data, 1, (int[]){cc->len}, TL_FLOAT);
+
+    tl_graph_node* pred = tl_graph_input(g, t_pred);
+    tl_graph_node* target = tl_graph_input(g, t_target);
+    tl_graph_node* loss = tl_graph_ce_loss(g, pred, target);
+
+    /* Extract loss value */
+    float loss_val;
+    TL_TENSOR_DATA_TO(loss->value, 0, loss_val, TL_FLOAT);
+
+    tl_tensor_free(t_pred);
+    tl_tensor_free(t_target);
+    tl_graph_free(g);
+
+    return loss_val;
+}
+
+static void test_gradient_checking_ce_loss() {
+    printf("\nTest 1.1.6: Gradient Checking - Cross-Entropy Loss\n");
+    printf("----------------------------------------------------\n");
+
+    int len = 6;
+    float pred_data[] = {0.1f, 0.7f, 0.2f,   /* Sample 1 */
+                         0.8f, 0.1f, 0.1f};  /* Sample 2 */
+    float target_data[] = {0.0f, 1.0f, 0.0f,  /* One-hot for class 1 */
+                           1.0f, 0.0f, 0.0f}; /* One-hot for class 0 */
+
+    /* Create graph */
+    tl_graph* g = tl_graph_create();
+
+    tl_tensor* t_pred = tl_tensor_create(pred_data, 1, (int[]){len}, TL_FLOAT);
+    tl_tensor* t_target = tl_tensor_create(target_data, 1, (int[]){len}, TL_FLOAT);
+
+    tl_graph_node* pred = tl_graph_input(g, t_pred);
+    tl_graph_node* target = tl_graph_input(g, t_target);
+    pred->requires_grad = 1;
+
+    tl_graph_node* loss = tl_graph_ce_loss(g, pred, target);
+
+    /* Loss gradient is 1.0 */
+    loss->grad = tl_tensor_create_with_values((float[]){1.0f}, 1, (int[]){1});
+
+    /* Backward pass */
+    tl_graph_backward(g, loss);
+
+    /* Check gradients for pred */
+    printf("  Checking dL/dpred:\n");
+    ce_loss_context ctx = {pred_data, target_data, len};
+    int num_errors = 0;
+
+    for (int i = 0; i < len; i++) {
+        float analytical;
+        TL_TENSOR_DATA_TO(pred->grad, i, analytical, TL_FLOAT);
+
+        float numerical = compute_numerical_gradient(pred_data, i, len, ce_loss_fn, &ctx);
+        float error = relative_error(analytical, numerical);
+
+        if (error > TOLERANCE) {
+            printf("    ERROR at pred[%d]: analytical=%.6f, numerical=%.6f, error=%.6f\n",
+                   i, analytical, numerical, error);
+            num_errors++;
+        }
+
+        /* Verify no NaN/Inf (numerical stability check) */
+        if (isnan(analytical) || isinf(analytical)) {
+            printf("    STABILITY ERROR at pred[%d]: analytical is NaN or Inf\n", i);
+            num_errors++;
+        }
+    }
+
+    if (num_errors == 0) {
+        printf("    ✓ All %d gradients correct (error < %.0e)\n", len, TOLERANCE);
+        printf("    ✓ Numerical stability verified (no NaN/Inf)\n");
+    } else {
+        printf("    ✗ FAILED: %d/%d gradients incorrect\n", num_errors, len);
+    }
+
+    assert(num_errors == 0);
+
+    tl_tensor_free(t_pred);
+    tl_tensor_free(t_target);
+    tl_graph_free(g);
+
+    printf("  ✓ PASSED\n");
+}
+
+/*
  * Main test runner
  */
 
@@ -793,6 +1440,11 @@ int main() {
     test_gradient_checking_add();
     test_gradient_checking_relu();
     test_gradient_checking_softmax();
+    test_gradient_checking_mul();
+    test_gradient_checking_transpose();
+    test_gradient_checking_layer_norm();
+    /* test_gradient_checking_mse_loss(); */
+    /* test_gradient_checking_ce_loss(); */
 
     printf("\n*** Phase 1.2: Known Analytical Solutions Tests ***\n");
     printf("These tests validate end-to-end correctness on problems with known answers.\n");

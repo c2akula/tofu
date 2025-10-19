@@ -116,6 +116,10 @@ TL_EXPORT tl_graph_node* tl_graph_layer_norm(tl_graph* g, tl_graph_node* x,
 TL_EXPORT tl_graph_node* tl_graph_reshape(tl_graph* g, tl_graph_node* x, int ndim, const int* dims);
 TL_EXPORT tl_graph_node* tl_graph_transpose(tl_graph* g, tl_graph_node* x, const int* axes);
 
+/* Loss functions */
+TL_EXPORT tl_graph_node* tl_graph_mse_loss(tl_graph* g, tl_graph_node* pred, tl_graph_node* target);
+TL_EXPORT tl_graph_node* tl_graph_ce_loss(tl_graph* g, tl_graph_node* pred, tl_graph_node* target);
+
 /* Backward pass */
 TL_EXPORT void tl_graph_backward(tl_graph* g, tl_graph_node* loss);
 

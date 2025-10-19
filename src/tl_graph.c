@@ -78,6 +78,28 @@ static void tl_graph_node_free(tl_graph_node* node)
 
     /* Free backward context if it exists */
     if (node->backward_ctx) {
+        /* Special handling for layer norm context which contains tensors */
+        if (node->op == TL_OP_LAYER_NORM) {
+            typedef struct {
+                int axis;
+                double eps;
+                tl_tensor* x_norm;
+                tl_tensor* mean;
+                tl_tensor* inv_std;
+                int n;
+            } layer_norm_ctx;
+
+            layer_norm_ctx* ctx = (layer_norm_ctx*)node->backward_ctx;
+            if (ctx->x_norm) {
+                tl_tensor_free_data_too(ctx->x_norm);
+            }
+            if (ctx->mean) {
+                tl_tensor_free_data_too(ctx->mean);
+            }
+            if (ctx->inv_std) {
+                tl_tensor_free_data_too(ctx->inv_std);
+            }
+        }
         free(node->backward_ctx);
         node->backward_ctx = NULL;
     }
@@ -433,6 +455,10 @@ TL_EXPORT tl_graph_node* tl_graph_layer_norm(tl_graph* g, tl_graph_node* x,
     typedef struct {
         int axis;
         double eps;
+        tl_tensor* x_norm;      /* Normalized input: (x - mean) / sqrt(var + eps) */
+        tl_tensor* mean;        /* Mean values */
+        tl_tensor* inv_std;     /* 1 / sqrt(var + eps) */
+        int n;                  /* Feature dimension size (number of elements normalized) */
     } layer_norm_ctx;
 
     layer_norm_ctx* ctx = (layer_norm_ctx*)malloc(sizeof(layer_norm_ctx));
@@ -440,15 +466,123 @@ TL_EXPORT tl_graph_node* tl_graph_layer_norm(tl_graph* g, tl_graph_node* x,
         return NULL;
     ctx->axis = axis;
     ctx->eps = eps;
-    node->backward_ctx = ctx;
+    ctx->n = x->value->dims[axis];
 
+    /* Compute layer norm and cache intermediate values */
     node->value = tl_tensor_layer_norm(x->value, NULL,
                                        gamma ? gamma->value : NULL,
                                        beta ? beta->value : NULL,
                                        axis, eps);
-    if (!node->value)
+    if (!node->value) {
+        free(ctx);
         return NULL;
+    }
 
+    /* Compute and cache intermediate values for backward pass */
+    /* We need: x_norm, mean, and inv_std */
+
+    /* Compute mean */
+    ctx->mean = tl_tensor_meanreduce(x->value, NULL, axis);
+    if (!ctx->mean) {
+        tl_tensor_free_data_too(node->value);
+        free(ctx);
+        return NULL;
+    }
+
+    /* Compute x_centered = x - mean (broadcast) */
+    tl_tensor* x_centered = tl_tensor_sub_broadcast(x->value, ctx->mean, NULL, axis);
+    if (!x_centered) {
+        tl_tensor_free_data_too(ctx->mean);
+        tl_tensor_free_data_too(node->value);
+        free(ctx);
+        return NULL;
+    }
+
+    /* Compute variance = mean((x - mean)^2) */
+    tl_tensor* x_centered_sq = tl_tensor_elew(x_centered, x_centered, NULL, TL_MUL);
+    if (!x_centered_sq) {
+        tl_tensor_free_data_too(x_centered);
+        tl_tensor_free_data_too(ctx->mean);
+        tl_tensor_free_data_too(node->value);
+        free(ctx);
+        return NULL;
+    }
+
+    tl_tensor* var = tl_tensor_meanreduce(x_centered_sq, NULL, axis);
+    if (!var) {
+        tl_tensor_free_data_too(x_centered_sq);
+        tl_tensor_free_data_too(x_centered);
+        tl_tensor_free_data_too(ctx->mean);
+        tl_tensor_free_data_too(node->value);
+        free(ctx);
+        return NULL;
+    }
+
+    /* Compute inv_std = 1 / sqrt(var + eps) and x_norm = x_centered / sqrt(var + eps) */
+    ctx->inv_std = tl_tensor_zeros(var->ndim, var->dims, TL_FLOAT);
+    if (!ctx->inv_std) {
+        tl_tensor_free_data_too(var);
+        tl_tensor_free_data_too(x_centered_sq);
+        tl_tensor_free_data_too(x_centered);
+        tl_tensor_free_data_too(ctx->mean);
+        tl_tensor_free_data_too(node->value);
+        free(ctx);
+        return NULL;
+    }
+
+    ctx->x_norm = tl_tensor_zeros(x->value->ndim, x->value->dims, TL_FLOAT);
+    if (!ctx->x_norm) {
+        tl_tensor_free_data_too(ctx->inv_std);
+        tl_tensor_free_data_too(var);
+        tl_tensor_free_data_too(x_centered_sq);
+        tl_tensor_free_data_too(x_centered);
+        tl_tensor_free_data_too(ctx->mean);
+        tl_tensor_free_data_too(node->value);
+        free(ctx);
+        return NULL;
+    }
+
+    /* Populate inv_std and x_norm */
+    for (int i = 0; i < var->len; i++) {
+        float var_val;
+        TL_TENSOR_DATA_TO(var, i, var_val, TL_FLOAT);
+        float std = sqrtf(var_val + (float)eps);
+        float inv_std_val = 1.0f / std;
+        TL_TENSOR_DATA_FROM(ctx->inv_std, i, inv_std_val, TL_FLOAT);
+    }
+
+    /* Compute x_norm = x_centered / std (using broadcast) */
+    int axis_size = x->value->dims[axis];
+    int outer_size = 1;
+    for (int i = 0; i < axis; i++) {
+        outer_size *= x->value->dims[i];
+    }
+    int inner_size = 1;
+    for (int i = axis + 1; i < x->value->ndim; i++) {
+        inner_size *= x->value->dims[i];
+    }
+
+    for (int i = 0; i < x->value->len; i++) {
+        /* Map element index to reduce index for var/mean */
+        int outer = i / (axis_size * inner_size);
+        int inner = i % inner_size;
+        int reduce_idx = outer * inner_size + inner;
+
+        float x_centered_val;
+        TL_TENSOR_DATA_TO(x_centered, i, x_centered_val, TL_FLOAT);
+        float inv_std_val;
+        TL_TENSOR_DATA_TO(ctx->inv_std, reduce_idx, inv_std_val, TL_FLOAT);
+
+        float x_norm_val = x_centered_val * inv_std_val;
+        TL_TENSOR_DATA_FROM(ctx->x_norm, i, x_norm_val, TL_FLOAT);
+    }
+
+    /* Clean up temporary tensors */
+    tl_tensor_free_data_too(var);
+    tl_tensor_free_data_too(x_centered_sq);
+    tl_tensor_free_data_too(x_centered);
+
+    node->backward_ctx = ctx;
     node->requires_grad = tl_graph_any_requires_grad(node->inputs, node->num_inputs);
 
     return node;
@@ -516,6 +650,142 @@ TL_EXPORT tl_graph_node* tl_graph_transpose(tl_graph* g, tl_graph_node* x, const
         return NULL;
 
     node->requires_grad = x->requires_grad;
+
+    return node;
+}
+
+/* Mean Squared Error Loss: L = (1/n) * Σ(pred - target)² */
+TL_EXPORT tl_graph_node* tl_graph_mse_loss(tl_graph* g, tl_graph_node* pred, tl_graph_node* target)
+{
+    assert(g && pred && target);
+    assert(pred->value && target->value);
+    assert(tl_tensor_issameshape(pred->value, target->value));
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_MSE_LOSS);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, pred) < 0 || tl_graph_node_add_input(node, target) < 0) {
+        return NULL;
+    }
+
+    /* Compute loss: (1/n) * Σ(pred - target)² */
+    tl_tensor* diff = tl_tensor_elew_broadcast(pred->value, target->value, NULL, TL_SUB);
+    if (!diff)
+        return NULL;
+
+    tl_tensor* diff_sq = tl_tensor_elew_param(diff, 2.0, NULL, TL_POW);
+    tl_tensor_free_data_too(diff);
+    if (!diff_sq)
+        return NULL;
+
+    /* Sum all elements manually */
+    int n = pred->value->len;
+    float sum = 0.0f;
+    for (int i = 0; i < n; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(diff_sq, i, val, TL_FLOAT);
+        sum += val;
+    }
+
+    /* Average: sum / n */
+    float loss_val = sum / n;
+
+    /* Create scalar loss tensor */
+    float* loss_data = (float*)malloc(sizeof(float));
+    if (!loss_data) {
+        tl_tensor_free_data_too(diff_sq);
+        return NULL;
+    }
+    *loss_data = loss_val;
+
+    tl_tensor* loss = tl_tensor_create(loss_data, 1, (int[]){1}, TL_FLOAT);
+    tl_tensor_free_data_too(diff_sq);
+    if (!loss) {
+        free(loss_data);
+        return NULL;
+    }
+
+    node->value = loss;
+    node->requires_grad = pred->requires_grad;
+
+    return node;
+}
+
+/* Cross-Entropy Loss: L = -(1/n) * Σ(target * log(pred)) */
+TL_EXPORT tl_graph_node* tl_graph_ce_loss(tl_graph* g, tl_graph_node* pred, tl_graph_node* target)
+{
+    assert(g && pred && target);
+    assert(pred->value && target->value);
+    assert(tl_tensor_issameshape(pred->value, target->value));
+
+    tl_graph_node* node = tl_graph_add_node(g, TL_OP_CE_LOSS);
+    if (!node)
+        return NULL;
+
+    if (tl_graph_node_add_input(node, pred) < 0 || tl_graph_node_add_input(node, target) < 0) {
+        return NULL;
+    }
+
+    /* Compute loss: -(1/n) * Σ(target * log(pred + epsilon))
+     * Add epsilon for numerical stability to avoid log(0) */
+    const float epsilon = 1e-7f;
+
+    tl_tensor* pred_safe = tl_tensor_elew_param(pred->value, epsilon, NULL, TL_SUM);
+    if (!pred_safe)
+        return NULL;
+
+    /* This is not ideal - we need log operation which may not exist
+     * For now, compute loss element-wise using available operations */
+    tl_tensor* log_pred = tl_tensor_clone(pred_safe);
+    if (!log_pred) {
+        tl_tensor_free_data_too(pred_safe);
+        return NULL;
+    }
+
+    /* Compute log(pred) element-wise */
+    for (int i = 0; i < log_pred->len; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(log_pred, i, val, TL_FLOAT);
+        val = logf(val);
+        TL_TENSOR_DATA_FROM(log_pred, i, val, TL_FLOAT);
+    }
+
+    tl_tensor_free_data_too(pred_safe);
+
+    /* Compute target * log(pred) */
+    tl_tensor* target_log_pred = tl_tensor_elew_broadcast(target->value, log_pred, NULL, TL_MUL);
+    tl_tensor_free_data_too(log_pred);
+    if (!target_log_pred)
+        return NULL;
+
+    /* Sum all elements manually */
+    int n = pred->value->len;
+    float sum = 0.0f;
+    for (int i = 0; i < n; i++) {
+        float val;
+        TL_TENSOR_DATA_TO(target_log_pred, i, val, TL_FLOAT);
+        sum += val;
+    }
+    tl_tensor_free_data_too(target_log_pred);
+
+    /* Compute loss: -(1/n) * sum */
+    float loss_val = -(1.0f / n) * sum;
+
+    /* Create scalar loss tensor */
+    float* loss_data = (float*)malloc(sizeof(float));
+    if (!loss_data)
+        return NULL;
+    *loss_data = loss_val;
+
+    tl_tensor* loss = tl_tensor_create(loss_data, 1, (int[]){1}, TL_FLOAT);
+    if (!loss) {
+        free(loss_data);
+        return NULL;
+    }
+
+    node->value = loss;
+    node->requires_grad = pred->requires_grad;
 
     return node;
 }
@@ -824,7 +1094,25 @@ static void softmax_backward(tl_graph_node* node)
     tl_tensor_free_data_too(sum_y_grad);
 }
 
-/* Layer norm backward: y = layer_norm(x, gamma, beta, axis, eps) */
+/* Layer norm backward: y = layer_norm(x, gamma, beta, axis, eps)
+ *
+ * Mathematical formulas (given ∂L/∂y):
+ *
+ * ∂L/∂γ = Σ(∂L/∂y ⊙ x_norm)   (sum over all dims except feature dim)
+ * ∂L/∂β = Σ(∂L/∂y)             (sum over all dims except feature dim)
+ *
+ * ∂L/∂x_norm = ∂L/∂y ⊙ γ
+ *
+ * ∂L/∂x = (1 / (n * σ)) * [
+ *     n * ∂L/∂x_norm - Σ(∂L/∂x_norm) - x_norm * Σ(∂L/∂x_norm ⊙ x_norm)
+ * ]
+ *
+ * where:
+ *   n = feature dimension size
+ *   σ = sqrt(var + eps) = 1 / inv_std (standard deviation)
+ *   ⊙ = element-wise multiplication
+ *   Σ = sum over feature dimension
+ */
 static void layer_norm_backward(tl_graph_node* node)
 {
     assert(node->op == TL_OP_LAYER_NORM);
@@ -838,26 +1126,24 @@ static void layer_norm_backward(tl_graph_node* node)
     if (!grad_y)
         return;
 
+    /* Retrieve cached values from forward pass */
     typedef struct {
         int axis;
         double eps;
+        tl_tensor* x_norm;
+        tl_tensor* mean;
+        tl_tensor* inv_std;
+        int n;
     } layer_norm_ctx;
+
     layer_norm_ctx* ctx = (layer_norm_ctx*)node->backward_ctx;
     int axis = ctx->axis;
     double eps = ctx->eps;
+    tl_tensor* x_norm = ctx->x_norm;
+    tl_tensor* inv_std = ctx->inv_std;
+    int n = ctx->n;
 
-    /* Compute mean and variance (same as forward pass) */
-    tl_tensor* mean = tl_tensor_meanreduce(x->value, NULL, axis);
-    tl_tensor* x_centered = tl_tensor_sub_broadcast(x->value, mean, NULL, axis);
-
-    /* var = mean((x - mean)^2) */
-    tl_tensor* x_centered_sq = tl_tensor_elew(x_centered, x_centered, NULL, TL_MUL);
-    tl_tensor* var = tl_tensor_meanreduce(x_centered_sq, NULL, axis);
-
-    /* Normalize: x_norm = (x - mean) / sqrt(var + eps) */
-    int N = x->value->dims[axis];
-
-    /* Compute dimension strides for gradient calculations */
+    /* Compute dimension parameters for reductions */
     int axis_size = x->value->dims[axis];
     int outer_size = 1;
     for (int i = 0; i < axis; i++) {
@@ -868,102 +1154,31 @@ static void layer_norm_backward(tl_graph_node* node)
         inner_size *= x->value->dims[i];
     }
 
-    /* Gradient w.r.t. input */
-    if (x->requires_grad) {
-        tl_tensor* grad_x = tl_tensor_zeros(x->value->ndim, x->value->dims, x->value->dtype);
-
-        /* This is a simplified version - full layer norm backward is complex */
-        /* For now, just pass gradient through assuming normalization is identity-like */
-        int axis_size = x->value->dims[axis];
-        int outer_size = 1;
-        for (int i = 0; i < axis; i++) {
-            outer_size *= x->value->dims[i];
-        }
-        int inner_size = 1;
-        for (int i = axis + 1; i < x->value->ndim; i++) {
-            inner_size *= x->value->dims[i];
-        }
-
-        for (int outer = 0; outer < outer_size; outer++) {
-            for (int inner = 0; inner < inner_size; inner++) {
-                float var_val;
-                int reduce_idx = outer * inner_size + inner;
-                TL_TENSOR_DATA_TO(var, reduce_idx, var_val, TL_FLOAT);
-                float std = sqrtf(var_val + (float)eps);
-
-                /* Compute gradient contributions */
-                float sum_grad_y = 0.0f;
-                float sum_grad_y_xnorm = 0.0f;
-
-                for (int j = 0; j < axis_size; j++) {
-                    int idx = outer * axis_size * inner_size + j * inner_size + inner;
-                    float x_centered_val, grad_y_val;
-                    TL_TENSOR_DATA_TO(x_centered, idx, x_centered_val, TL_FLOAT);
-                    TL_TENSOR_DATA_TO(grad_y, idx, grad_y_val, TL_FLOAT);
-
-                    float gamma_val = 1.0f;
-                    if (gamma && gamma->value) {
-                        /* gamma has reduced dimensions along axis */
-                        int gamma_idx = (gamma->value->ndim == 1) ? j : idx;
-                        TL_TENSOR_DATA_TO(gamma->value, gamma_idx, gamma_val, TL_FLOAT);
-                    }
-
-                    sum_grad_y += grad_y_val * gamma_val;
-                    sum_grad_y_xnorm += grad_y_val * gamma_val * (x_centered_val / std);
-                }
-
-                /* Apply gradient formula */
-                for (int j = 0; j < axis_size; j++) {
-                    int idx = outer * axis_size * inner_size + j * inner_size + inner;
-                    float x_centered_val, grad_y_val;
-                    TL_TENSOR_DATA_TO(x_centered, idx, x_centered_val, TL_FLOAT);
-                    TL_TENSOR_DATA_TO(grad_y, idx, grad_y_val, TL_FLOAT);
-
-                    float gamma_val = 1.0f;
-                    if (gamma && gamma->value) {
-                        int gamma_idx = (gamma->value->ndim == 1) ? j : idx;
-                        TL_TENSOR_DATA_TO(gamma->value, gamma_idx, gamma_val, TL_FLOAT);
-                    }
-
-                    float grad = (gamma_val * grad_y_val - sum_grad_y / N - (x_centered_val / std) * sum_grad_y_xnorm / N) / std;
-                    TL_TENSOR_DATA_FROM(grad_x, idx, grad, TL_FLOAT);
-                }
-            }
-        }
-
-        accumulate_grad(x, grad_x);
-        tl_tensor_free_data_too(grad_x);
-    }
-
-    /* Gradient w.r.t. gamma (scale parameter) */
+    /* ========== STEP 1: Compute ∂L/∂γ (scale parameter gradient) ==========
+     * ∂L/∂γ = Σ(∂L/∂y ⊙ x_norm)
+     * Sum over all dimensions except feature dimension
+     */
     if (gamma && gamma->requires_grad) {
         tl_tensor* grad_gamma = tl_tensor_zeros(gamma->value->ndim, gamma->value->dims, gamma->value->dtype);
 
-        /* ∂L/∂gamma = Σ(∂L/∂y * x_normalized) */
+        /* Accumulate contributions for each feature dimension */
         for (int i = 0; i < x->value->len; i++) {
-            float var_val, x_centered_val, grad_y_val;
+            /* Extract gamma index (feature dimension index) */
+            int axis_idx = (i / inner_size) % axis_size;
+            int gamma_idx = (gamma->value->ndim == 1) ? axis_idx : i;
 
-            /* Map to reduce index for var */
-            int axis_size = x->value->dims[axis];
-            int inner_size = 1;
-            for (int k = axis + 1; k < x->value->ndim; k++) {
-                inner_size *= x->value->dims[k];
-            }
-            int reduce_idx = (i / inner_size) / axis_size * inner_size + (i % inner_size);
-
-            TL_TENSOR_DATA_TO(var, reduce_idx, var_val, TL_FLOAT);
-            TL_TENSOR_DATA_TO(x_centered, i, x_centered_val, TL_FLOAT);
+            float grad_y_val;
             TL_TENSOR_DATA_TO(grad_y, i, grad_y_val, TL_FLOAT);
 
-            float std = sqrtf(var_val + (float)eps);
-            float x_norm = x_centered_val / std;
+            float x_norm_val;
+            TL_TENSOR_DATA_TO(x_norm, i, x_norm_val, TL_FLOAT);
 
-            int gamma_idx = (gamma->value->ndim == 1) ? ((i / inner_size) % axis_size) : i;
-            float grad_contrib = grad_y_val * x_norm;
+            /* Contribution: ∂L/∂y[i] * x_norm[i] */
+            float contrib = grad_y_val * x_norm_val;
 
             float current_grad;
             TL_TENSOR_DATA_TO(grad_gamma, gamma_idx, current_grad, TL_FLOAT);
-            current_grad += grad_contrib;
+            current_grad += contrib;
             TL_TENSOR_DATA_FROM(grad_gamma, gamma_idx, current_grad, TL_FLOAT);
         }
 
@@ -971,22 +1186,21 @@ static void layer_norm_backward(tl_graph_node* node)
         tl_tensor_free_data_too(grad_gamma);
     }
 
-    /* Gradient w.r.t. beta (shift parameter) */
+    /* ========== STEP 2: Compute ∂L/∂β (bias parameter gradient) ==========
+     * ∂L/∂β = Σ(∂L/∂y)
+     * Sum over all dimensions except feature dimension
+     */
     if (beta && beta->requires_grad) {
-        /* ∂L/∂beta = Σ(∂L/∂y) - sum over all dimensions except the normalized axis */
         tl_tensor* grad_beta = tl_tensor_zeros(beta->value->ndim, beta->value->dims, beta->value->dtype);
 
-        /* Sum grad_y over all dimensions except axis */
+        /* Accumulate contributions for each feature dimension */
         for (int i = 0; i < x->value->len; i++) {
+            /* Extract beta index (feature dimension index) */
+            int axis_idx = (i / inner_size) % axis_size;
+            int beta_idx = (beta->value->ndim == 1) ? axis_idx : i;
+
             float grad_y_val;
             TL_TENSOR_DATA_TO(grad_y, i, grad_y_val, TL_FLOAT);
-
-            /* Map to beta index (only the axis dimension matters) */
-            int inner_size = 1;
-            for (int k = axis + 1; k < x->value->ndim; k++) {
-                inner_size *= x->value->dims[k];
-            }
-            int beta_idx = (beta->value->ndim == 1) ? ((i / inner_size) % axis_size) : i;
 
             float current_grad;
             TL_TENSOR_DATA_TO(grad_beta, beta_idx, current_grad, TL_FLOAT);
@@ -998,10 +1212,261 @@ static void layer_norm_backward(tl_graph_node* node)
         tl_tensor_free_data_too(grad_beta);
     }
 
-    tl_tensor_free_data_too(mean);
-    tl_tensor_free_data_too(x_centered);
-    tl_tensor_free_data_too(x_centered_sq);
-    tl_tensor_free_data_too(var);
+    /* ========== STEP 3: Compute ∂L/∂x_norm (intermediate gradient) ==========
+     * ∂L/∂x_norm = ∂L/∂y ⊙ γ
+     */
+    tl_tensor* grad_x_norm = tl_tensor_zeros(x->value->ndim, x->value->dims, x->value->dtype);
+    for (int i = 0; i < x->value->len; i++) {
+        float grad_y_val;
+        TL_TENSOR_DATA_TO(grad_y, i, grad_y_val, TL_FLOAT);
+
+        float gamma_val = 1.0f;
+        if (gamma && gamma->value) {
+            int axis_idx = (i / inner_size) % axis_size;
+            int gamma_idx = (gamma->value->ndim == 1) ? axis_idx : i;
+            TL_TENSOR_DATA_TO(gamma->value, gamma_idx, gamma_val, TL_FLOAT);
+        }
+
+        float grad_x_norm_val = grad_y_val * gamma_val;
+        TL_TENSOR_DATA_FROM(grad_x_norm, i, grad_x_norm_val, TL_FLOAT);
+    }
+
+    /* ========== STEP 4: Compute ∂L/∂x (input gradient) - MOST COMPLEX ==========
+     * This is the most complex part: chain rule through normalization
+     *
+     * ∂L/∂x = (1 / (n * σ)) * [
+     *     n * ∂L/∂x_norm - Σ(∂L/∂x_norm) - x_norm * Σ(∂L/∂x_norm ⊙ x_norm)
+     * ]
+     *
+     * where Σ denotes sum over the feature dimension
+     */
+    if (x->requires_grad) {
+        tl_tensor* grad_x = tl_tensor_zeros(x->value->ndim, x->value->dims, x->value->dtype);
+
+        /* For each normalization group (outer_size * inner_size total) */
+        for (int outer = 0; outer < outer_size; outer++) {
+            for (int inner = 0; inner < inner_size; inner++) {
+                int reduce_idx = outer * inner_size + inner;
+
+                /* Get sigma (std dev) = 1 / inv_std */
+                float inv_std_val;
+                TL_TENSOR_DATA_TO(inv_std, reduce_idx, inv_std_val, TL_FLOAT);
+                float sigma = 1.0f / inv_std_val;
+
+                /* Compute Σ(∂L/∂x_norm) over feature dimension */
+                float sum_grad_x_norm = 0.0f;
+                for (int j = 0; j < axis_size; j++) {
+                    int idx = outer * axis_size * inner_size + j * inner_size + inner;
+                    float grad_x_norm_val;
+                    TL_TENSOR_DATA_TO(grad_x_norm, idx, grad_x_norm_val, TL_FLOAT);
+                    sum_grad_x_norm += grad_x_norm_val;
+                }
+
+                /* Compute Σ(∂L/∂x_norm ⊙ x_norm) = Σ(∂L/∂x_norm * x_norm) */
+                float sum_grad_x_norm_times_x_norm = 0.0f;
+                for (int j = 0; j < axis_size; j++) {
+                    int idx = outer * axis_size * inner_size + j * inner_size + inner;
+                    float grad_x_norm_val;
+                    TL_TENSOR_DATA_TO(grad_x_norm, idx, grad_x_norm_val, TL_FLOAT);
+                    float x_norm_val;
+                    TL_TENSOR_DATA_TO(x_norm, idx, x_norm_val, TL_FLOAT);
+                    sum_grad_x_norm_times_x_norm += grad_x_norm_val * x_norm_val;
+                }
+
+                /* Compute gradient for each element in this normalization group */
+                for (int j = 0; j < axis_size; j++) {
+                    int idx = outer * axis_size * inner_size + j * inner_size + inner;
+
+                    float grad_x_norm_val;
+                    TL_TENSOR_DATA_TO(grad_x_norm, idx, grad_x_norm_val, TL_FLOAT);
+
+                    float x_norm_val;
+                    TL_TENSOR_DATA_TO(x_norm, idx, x_norm_val, TL_FLOAT);
+
+                    /* Formula: grad_x = (1 / (n * σ)) * [
+                     *     n * grad_x_norm - sum_grad_x_norm - x_norm * sum_grad_x_norm_times_x_norm
+                     * ]
+                     */
+                    float numerator = n * grad_x_norm_val - sum_grad_x_norm - x_norm_val * sum_grad_x_norm_times_x_norm;
+                    float grad_x_val = numerator / (n * sigma);
+
+                    TL_TENSOR_DATA_FROM(grad_x, idx, grad_x_val, TL_FLOAT);
+                }
+            }
+        }
+
+        accumulate_grad(x, grad_x);
+        tl_tensor_free_data_too(grad_x);
+    }
+
+    /* Clean up intermediate tensors */
+    tl_tensor_free_data_too(grad_x_norm);
+}
+
+/* MSE Loss backward: L = (1/n) * Σ(pred - target)²
+ * ∂L/∂pred = (2/n) * (pred - target) */
+static void mse_loss_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_MSE_LOSS);
+    assert(node->num_inputs == 2);
+
+    tl_graph_node* pred = node->inputs[0];
+    tl_graph_node* target = node->inputs[1];
+    tl_tensor* grad_loss = node->grad;
+
+    if (!grad_loss)
+        return;
+
+    /* Compute gradient: ∂L/∂pred = (2/n) * (pred - target)
+     * Since grad_loss is a scalar (1.0), we need to:
+     * grad_pred = grad_loss * (2/n) * (pred - target) */
+
+    if (pred->requires_grad) {
+        /* Compute (pred - target) */
+        tl_tensor* diff = tl_tensor_elew_broadcast(pred->value, target->value, NULL, TL_SUB);
+        if (!diff)
+            return;
+
+        /* Scale by (2/n) */
+        int n = pred->value->len;
+        tl_tensor* grad_pred = tl_tensor_elew_param(diff, 2.0f / n, NULL, TL_MUL);
+        tl_tensor_free_data_too(diff);
+        if (!grad_pred)
+            return;
+
+        /* Scale by grad_loss (chain rule) - grad_loss is scalar */
+        if (grad_loss->len == 1) {
+            float loss_grad_val;
+            TL_TENSOR_DATA_TO(grad_loss, 0, loss_grad_val, TL_FLOAT);
+            if (loss_grad_val != 1.0f) {
+                tl_tensor* scaled_grad = tl_tensor_elew_param(grad_pred, loss_grad_val, NULL, TL_MUL);
+                tl_tensor_free_data_too(grad_pred);
+                grad_pred = scaled_grad;
+            }
+        }
+
+        accumulate_grad(pred, grad_pred);
+        tl_tensor_free_data_too(grad_pred);
+    }
+
+    /* Target is not trainable, so no gradient accumulation needed */
+}
+
+/* Cross-Entropy Loss backward: L = -(1/n) * Σ(target * log(pred))
+ * ∂L/∂pred = -(1/n) * (target / (pred + epsilon)) */
+static void ce_loss_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_CE_LOSS);
+    assert(node->num_inputs == 2);
+
+    tl_graph_node* pred = node->inputs[0];
+    tl_graph_node* target = node->inputs[1];
+    tl_tensor* grad_loss = node->grad;
+
+    if (!grad_loss)
+        return;
+
+    if (pred->requires_grad) {
+        const float epsilon = 1e-7f;
+
+        /* Compute gradient: ∂L/∂pred = -(1/n) * (target / (pred + epsilon))
+         * Since we computed loss as -(1/n) * Σ(target * log(pred + epsilon)),
+         * gradient is -(target / (pred + epsilon)) / n */
+
+        /* Compute (pred + epsilon) for numerical stability */
+        tl_tensor* pred_safe = tl_tensor_elew_param(pred->value, epsilon, NULL, TL_SUM);
+        if (!pred_safe)
+            return;
+
+        /* Compute target / (pred + epsilon)
+         * Note: tl_tensor_elew doesn't have a DIV operation directly
+         * We'll do this element-wise */
+        tl_tensor* grad_pred = tl_tensor_zeros(pred->value->ndim, pred->value->dims, TL_FLOAT);
+        if (!grad_pred) {
+            tl_tensor_free_data_too(pred_safe);
+            return;
+        }
+
+        int n = pred->value->len;
+        for (int i = 0; i < n; i++) {
+            float target_val;
+            float pred_safe_val;
+            TL_TENSOR_DATA_TO(target->value, i, target_val, TL_FLOAT);
+            TL_TENSOR_DATA_TO(pred_safe, i, pred_safe_val, TL_FLOAT);
+
+            /* grad = -(1/n) * (target / pred_safe) */
+            float grad_val = -(1.0f / n) * (target_val / pred_safe_val);
+
+            TL_TENSOR_DATA_FROM(grad_pred, i, grad_val, TL_FLOAT);
+        }
+
+        tl_tensor_free_data_too(pred_safe);
+
+        /* Scale by grad_loss (chain rule) - grad_loss is scalar */
+        if (grad_loss->len == 1) {
+            float loss_grad_val;
+            TL_TENSOR_DATA_TO(grad_loss, 0, loss_grad_val, TL_FLOAT);
+            if (loss_grad_val != 1.0f) {
+                tl_tensor* scaled_grad = tl_tensor_elew_param(grad_pred, loss_grad_val, NULL, TL_MUL);
+                tl_tensor_free_data_too(grad_pred);
+                grad_pred = scaled_grad;
+            }
+        }
+
+        accumulate_grad(pred, grad_pred);
+        tl_tensor_free_data_too(grad_pred);
+    }
+
+    /* Target is not trainable, so no gradient accumulation needed */
+}
+
+/* Transpose backward: y = transpose(x, axes) */
+static void transpose_backward(tl_graph_node* node)
+{
+    assert(node->op == TL_OP_TRANSPOSE);
+    assert(node->num_inputs == 1);
+
+    tl_graph_node* x = node->inputs[0];
+    tl_tensor* grad_y = node->grad;
+
+    if (!grad_y || !x->requires_grad)
+        return;
+
+    /* Get the axes permutation from backward context */
+    int* axes = (int*)node->backward_ctx;
+    int ndim = x->value->ndim;
+
+    /* Compute inverse permutation
+     * If axes[i] = j, then inv_axes[j] = i
+     * Example: axes = [2, 0, 1] -> inv_axes = [1, 2, 0]
+     */
+    int* inv_axes = (int*)malloc(ndim * sizeof(int));
+    if (!inv_axes)
+        return;
+
+    if (axes) {
+        for (int i = 0; i < ndim; i++) {
+            inv_axes[axes[i]] = i;
+        }
+    } else {
+        /* If axes is NULL, it means default transpose (reverse all dims)
+         * For 3D: [0,1,2] -> [2,1,0], inverse is [2,1,0] */
+        for (int i = 0; i < ndim; i++) {
+            inv_axes[i] = ndim - 1 - i;
+        }
+    }
+
+    /* Apply inverse transpose to gradient
+     * ∂L/∂x = transpose(∂L/∂y, inv_axes) */
+    tl_tensor* grad_x = tl_tensor_transpose(grad_y, NULL, inv_axes);
+    if (!grad_x) {
+        free(inv_axes);
+        return;
+    }
+
+    accumulate_grad(x, grad_x);
+    tl_tensor_free_data_too(grad_x);
+    free(inv_axes);
 }
 
 /* Assign backward functions to nodes */
@@ -1025,6 +1490,15 @@ static void assign_backward_fn(tl_graph_node* node)
             break;
         case TL_OP_LAYER_NORM:
             node->backward_fn = layer_norm_backward;
+            break;
+        case TL_OP_MSE_LOSS:
+            node->backward_fn = mse_loss_backward;
+            break;
+        case TL_OP_CE_LOSS:
+            node->backward_fn = ce_loss_backward;
+            break;
+        case TL_OP_TRANSPOSE:
+            node->backward_fn = transpose_backward;
             break;
         case TL_OP_INPUT:
         case TL_OP_PARAM:
