@@ -33,3 +33,6 @@ test_*
 test/standalone/test_validation_phase*
 test/standalone/test_gradient_*
 !test/standalone/*.c
+
+# Claude Code session files
+.claude/
