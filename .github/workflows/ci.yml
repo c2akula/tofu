@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [ develop, master ]
+  pull_request:
+    branches: [ develop, master ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        # macOS has build tools pre-installed
+        echo "Using pre-installed build tools"
+
+    - name: Configure build
+      run: |
+        chmod +x configure
+        ./configure
+
+    - name: Build library
+      run: make lib
+
+    - name: Build validation tests
+      run: |
+        gcc -o test/standalone/test_validation_phase1 test/standalone/test_validation_phase1.c -I src build/lib/libtofu.a -lm
+        gcc -o test/standalone/test_validation_phase3 test/standalone/test_validation_phase3.c -I src build/lib/libtofu.a -lm
+
+    - name: Run Phase 1 validation tests
+      run: |
+        echo "=== Phase 1: Gradient Correctness ==="
+        ./test/standalone/test_validation_phase1
+        echo ""
+
+    - name: Run Phase 3 validation tests
+      run: |
+        echo "=== Phase 3: Problem Diversity ==="
+        ./test/standalone/test_validation_phase3
+        echo ""
+
+    - name: Test summary
+      if: success()
+      run: |
+        echo "✅ All validation tests passed!"
+        echo "   - Phase 1: 6/6 tests (gradient correctness)"
+        echo "   - Phase 3: 2/2 tests (multiclass + regression)"
