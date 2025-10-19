@@ -303,6 +303,105 @@ int test_add_no_broadcast() {
     return TEST_PASS;
 }
 
+/* ============================================================
+ * Test 5: MATMUL with Batch Broadcasting
+ * ============================================================
+ * Forward: A[1,3,4] @ B[2,4,5] -> C[2,3,5]
+ * Backward: grad_A should be [1,3,4] (sum over batch dim 0)
+ *           grad_B should be [2,4,5] (no reduction needed)
+ */
+int test_matmul_batch_broadcast() {
+    tofu_graph* g = tofu_graph_create();
+
+    /* Create tensors with batch broadcasting */
+    float A_data[12];  /* [1,3,4] - will broadcast to [2,3,4] */
+    float B_data[40];  /* [2,4,5] - no broadcasting */
+
+    /* Initialize with simple values */
+    for (int i = 0; i < 12; i++) {
+        A_data[i] = (float)(i + 1);  /* 1, 2, 3, ..., 12 */
+    }
+    for (int i = 0; i < 40; i++) {
+        B_data[i] = 1.0f;  /* All ones for easier gradient calculation */
+    }
+
+    tofu_tensor* t_A = tofu_tensor_create(A_data, 3, (int[]){1, 3, 4}, TOFU_FLOAT);
+    tofu_tensor* t_B = tofu_tensor_create(B_data, 3, (int[]){2, 4, 5}, TOFU_FLOAT);
+
+    /* Build graph: C = A @ B */
+    tofu_graph_node* A = tofu_graph_param(g, t_A);
+    tofu_graph_node* B = tofu_graph_param(g, t_B);
+    tofu_graph_node* C = tofu_graph_matmul(g, A, B);
+
+    /* Check forward pass output shape */
+    if (!C->value || C->value->ndim != 3 ||
+        C->value->dims[0] != 2 || C->value->dims[1] != 3 || C->value->dims[2] != 5) {
+        printf("      Error: Forward pass output shape incorrect\n");
+        tofu_tensor_free(t_A);
+        tofu_tensor_free(t_B);
+        tofu_graph_free(g);
+        return TEST_FAIL;
+    }
+
+    /* Initialize gradient at output (all ones) */
+    tofu_graph_zero_grad(g);
+    tofu_graph_backward(g, C);
+
+    /* Check gradient shape for A - should be [1,3,4] */
+    if (!A->grad) {
+        printf("      Error: grad_A is NULL\n");
+        tofu_tensor_free(t_A);
+        tofu_tensor_free(t_B);
+        tofu_graph_free(g);
+        return TEST_FAIL;
+    }
+
+    if (A->grad->ndim != 3 || A->grad->dims[0] != 1 ||
+        A->grad->dims[1] != 3 || A->grad->dims[2] != 4) {
+        printf("      Error: grad_A shape incorrect - got [");
+        for (int i = 0; i < A->grad->ndim; i++) {
+            printf("%d%s", A->grad->dims[i], (i < A->grad->ndim - 1) ? "," : "");
+        }
+        printf("], expected [1,3,4]\n");
+        tofu_tensor_free(t_A);
+        tofu_tensor_free(t_B);
+        tofu_graph_free(g);
+        return TEST_FAIL;
+    }
+
+    /* Check gradient shape for B - should be [2,4,5] (no change) */
+    if (!B->grad || B->grad->ndim != 3 ||
+        B->grad->dims[0] != 2 || B->grad->dims[1] != 4 || B->grad->dims[2] != 5) {
+        printf("      Error: grad_B shape incorrect\n");
+        tofu_tensor_free(t_A);
+        tofu_tensor_free(t_B);
+        tofu_graph_free(g);
+        return TEST_FAIL;
+    }
+
+    /* Verify gradient values
+     * Since B is all ones and grad_C is all ones:
+     * grad_A[0,i,j] should be sum over batches of: grad_C[b,i,:] @ B[b,j,:].T
+     * With B=1 and grad_C=1, grad_A[0,i,j] should be 2*5 = 10 (sum over 2 batches, 5 columns)
+     */
+    for (int i = 0; i < 12; i++) {
+        float grad_val;
+        TOFU_TENSOR_DATA_TO(A->grad, i, grad_val, TOFU_FLOAT);
+        if (fabsf(grad_val - 10.0f) > TOLERANCE) {
+            printf("      Error: grad_A[%d] = %f, expected 10.0\n", i, grad_val);
+            tofu_tensor_free(t_A);
+            tofu_tensor_free(t_B);
+            tofu_graph_free(g);
+            return TEST_FAIL;
+        }
+    }
+
+    tofu_tensor_free(t_A);
+    tofu_tensor_free(t_B);
+    tofu_graph_free(g);
+    return TEST_PASS;
+}
+
 int main() {
     printf("============================================================\n");
     printf("Tofu Broadcasting Gradient Test Suite\n");
@@ -317,6 +416,9 @@ int main() {
     printf("\nCategory: ADD Broadcasting Tests\n");
     report_test("test_add_broadcast_scalar", test_add_broadcast_scalar());
     report_test("test_add_no_broadcast", test_add_no_broadcast());
+
+    printf("\nCategory: MATMUL Batch Broadcasting Tests\n");
+    report_test("test_matmul_batch_broadcast", test_matmul_batch_broadcast());
 
     printf("\n============================================================\n");
     printf("Test Summary\n");

@@ -941,23 +941,46 @@ static void matmul_backward(tofu_graph_node* node)
 
     /* ∂L/∂A = (∂L/∂y) @ B^T */
     if (A->requires_grad) {
-        tofu_tensor* B_T = tofu_tensor_transpose(B->value, NULL, NULL);
-        tofu_tensor* grad_A = tofu_tensor_matmul(grad_y_2d, B_T, NULL);
+        /* For batch matmul, transpose only the last 2 dimensions (matrix dims), not batch dims */
+        tofu_tensor* B_T = NULL;
+        if (B->value->ndim == 2) {
+            /* Simple 2D case */
+            B_T = tofu_tensor_transpose(B->value, NULL, NULL);
+        } else {
+            /* N-D case: transpose only last 2 dims */
+            int* axes = (int*)malloc(B->value->ndim * sizeof(int));
+            for (int i = 0; i < B->value->ndim - 2; i++) {
+                axes[i] = i;  /* Keep batch dimensions in order */
+            }
+            axes[B->value->ndim - 2] = B->value->ndim - 1;  /* Swap last two */
+            axes[B->value->ndim - 1] = B->value->ndim - 2;
+            B_T = tofu_tensor_transpose(B->value, NULL, axes);
+            free(axes);
+        }
+        tofu_tensor* grad_A_full = tofu_tensor_matmul(grad_y_2d, B_T, NULL);
 
-        /* Reshape back to original shape if needed */
+        /* Reduce gradient if broadcasting occurred in batch dimensions */
+        tofu_tensor* grad_A = reduce_grad_for_broadcast(grad_A_full, A->value);
+
+        /* Reshape back to original shape if needed (for 1D inputs) */
         if (is_A_1d && grad_A->ndim == 2) {
             if (grad_A->dims[0] == 1) {
                 /* Squeeze [1, n] to [n] */
                 int new_dims[] = {grad_A->dims[1]};
                 tofu_tensor* grad_A_1d = tofu_tensor_reshape(grad_A, 1, new_dims);
-                tofu_tensor_free(grad_A);
+                if (grad_A != grad_A_full) {
+                    tofu_tensor_free_data_too(grad_A);
+                }
                 grad_A = grad_A_1d;
             }
         }
 
         accumulate_grad(A, grad_A);
         tofu_tensor_free_data_too(B_T);
-        tofu_tensor_free_data_too(grad_A);
+        tofu_tensor_free_data_too(grad_A_full);
+        if (grad_A != grad_A_full) {
+            tofu_tensor_free_data_too(grad_A);
+        }
     }
 
     /* ∂L/∂B = A^T @ (∂L/∂y) */
@@ -972,8 +995,22 @@ static void matmul_backward(tofu_graph_node* node)
             A_val = A_2d;
         }
 
-        /* Transpose: [1, n] → [n, 1] */
-        tofu_tensor* A_T = tofu_tensor_transpose(A_val, NULL, NULL);
+        /* Transpose only matrix dimensions (last 2) */
+        tofu_tensor* A_T = NULL;
+        if (A_val->ndim == 2) {
+            /* Simple 2D case */
+            A_T = tofu_tensor_transpose(A_val, NULL, NULL);
+        } else {
+            /* N-D case: transpose only last 2 dims */
+            int* axes = (int*)malloc(A_val->ndim * sizeof(int));
+            for (int i = 0; i < A_val->ndim - 2; i++) {
+                axes[i] = i;  /* Keep batch dimensions in order */
+            }
+            axes[A_val->ndim - 2] = A_val->ndim - 1;  /* Swap last two */
+            axes[A_val->ndim - 1] = A_val->ndim - 2;
+            A_T = tofu_tensor_transpose(A_val, NULL, axes);
+            free(axes);
+        }
 
         /* Reshape grad_y if needed for matmul with A_T */
         tofu_tensor* grad_y_for_B = grad_y;
@@ -985,7 +1022,10 @@ static void matmul_backward(tofu_graph_node* node)
             grad_y_for_B = grad_y_B_reshaped;
         }
 
-        tofu_tensor* grad_B = tofu_tensor_matmul(A_T, grad_y_for_B, NULL);
+        tofu_tensor* grad_B_full = tofu_tensor_matmul(A_T, grad_y_for_B, NULL);
+
+        /* Reduce gradient if broadcasting occurred in batch dimensions */
+        tofu_tensor* grad_B = reduce_grad_for_broadcast(grad_B_full, B->value);
 
         accumulate_grad(B, grad_B);
 
@@ -994,7 +1034,10 @@ static void matmul_backward(tofu_graph_node* node)
         if (grad_y_B_reshaped)
             tofu_tensor_free(grad_y_B_reshaped);
         tofu_tensor_free_data_too(A_T);
-        tofu_tensor_free_data_too(grad_B);
+        tofu_tensor_free_data_too(grad_B_full);
+        if (grad_B != grad_B_full) {
+            tofu_tensor_free_data_too(grad_B);
+        }
     }
 
     /* Free temporary grad_y_2d if we created it */
