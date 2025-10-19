@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- API stabilization for v1.0.0
+- Phase 3: Performance benchmarks (deferred to v1.1.0)
+- Phase 5: Final polish for v1.0.0 release
+
+## [0.9.0] - 2025-10-19
 
 ### Added - Milestone 4: API Stabilization
 **Phase 2: API Documentation**
@@ -152,7 +155,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 63+ initial tests
 - MLP and ViT examples
 
-[Unreleased]: https://github.com/username/tofu/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/username/tofu/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/username/tofu/compare/v0.5.0...v0.9.0
+[0.5.0]: https://github.com/username/tofu/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/username/tofu/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/username/tofu/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/username/tofu/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/username/tofu/releases/tag/v0.1.0

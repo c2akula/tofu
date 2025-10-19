@@ -1,6 +1,6 @@
 # Tofu
 
-![Version](https://img.shields.io/badge/version-0.5.0-blue)
+![Version](https://img.shields.io/badge/version-0.9.0-blue)
 ![Tests](https://img.shields.io/badge/tests-13%2F13%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20ESP32-lightgrey)
