@@ -8,11 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- CI/CD pipeline (GitHub Actions)
-- Enhanced README with badges
-- CNN and ResNet examples
 - Error handling improvements
 - API stabilization for v1.0.0
+- Memory leak testing (valgrind)
+- Edge case testing
+
+## [0.4.0] - 2025-10-19
+
+### Added - Milestone 2: Quick Wins & Examples
+- **GitHub Actions CI/CD**: Automated testing on every commit
+  - Multi-platform builds (Ubuntu, macOS)
+  - Runs validation tests (Phase 1 + Phase 3)
+  - Reports test results with summary
+- **Enhanced README**:
+  - Badges (version, tests, license, platform)
+  - Quick Start code example with autodiff
+  - Updated feature list highlighting deep learning
+- **CHANGELOG.md**: Tracking all releases using Keep a Changelog format
+- **Examples**:
+  - CNN training example (8x8 pattern recognition, 100% accuracy)
+  - ResNet training example (residual blocks with skip connections, 100% accuracy)
+
+### Changed
+- Reorganized ROADMAP: Documentation deferred to post-v1.0.0
+- Added mdBook documentation plan (Rust-style)
+- Repository cleanup: Archived development docs to .claude/docs/
 
 ## [0.3.0] - 2025-10-19
 
