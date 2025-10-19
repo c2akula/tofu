@@ -1,8 +1,9 @@
 /*
- * Tofu Framework - Validation Test Suite Phase 3: Multi-Class Classification
+ * Tofu Framework - Validation Test Suite Phase 3: Multi-Class Classification & Regression
  *
  * This test suite validates the framework's ability to perform multi-class
- * classification on linearly separable data using a 2-layer neural network.
+ * classification on linearly separable data using a 2-layer neural network,
+ * and function regression using a 3-layer neural network.
  *
  * Test 3.1: Multi-Class Classification
  * - Dataset: 3 classes of 2D points (10 samples per class)
@@ -11,6 +12,14 @@
  * - Optimizer: SGD with lr=0.01
  * - Training: 200 epochs
  * - Success: Accuracy > 90%
+ *
+ * Test 3.2: Regression (Sine Function)
+ * - Dataset: 50 samples uniformly sampled from [-π, π]
+ * - Network: [1] -> [16] -> [16] -> [1] with ReLU + linear output
+ * - Loss: MSE loss
+ * - Optimizer: SGD with lr=0.01
+ * - Training: 500 epochs
+ * - Success: Final MSE < 0.01
  */
 
 #include <stdio.h>
@@ -32,6 +41,16 @@
 #define LEARNING_RATE 0.01f
 #define NOISE_STDDEV 0.1f
 #define ACCURACY_THRESHOLD 0.90f
+
+/* Test 3.2: Regression (Sine Function) - Constants */
+#define REGRESSION_NUM_SAMPLES 50
+#define REGRESSION_INPUT_DIM 1
+#define REGRESSION_HIDDEN_DIM 16
+#define REGRESSION_OUTPUT_DIM 1
+#define REGRESSION_EPOCHS 500
+#define REGRESSION_LEARNING_RATE 0.01f
+#define REGRESSION_MSE_THRESHOLD 0.01f
+#define PI 3.14159265359f
 
 /* Class centers for 3-class problem */
 static const float class_centers[NUM_CLASSES][INPUT_DIM] = {
@@ -140,6 +159,21 @@ static int get_true_class(float* label, int num_classes) {
         }
     }
     return 0;  /* Should not happen with valid one-hot encoding */
+}
+
+/*
+ * Helper: Generate dataset for sine function regression
+ * Outputs:
+ *   - X: (50, 1) matrix of x values uniformly sampled from [-π, π]
+ *   - Y: (50, 1) matrix of y = sin(x) values
+ */
+static void generate_sine_dataset(float* X, float* Y) {
+    for (int i = 0; i < REGRESSION_NUM_SAMPLES; i++) {
+        /* Uniform sample from [-π, π] */
+        float x = -PI + (2.0f * PI) * ((float)i / (REGRESSION_NUM_SAMPLES - 1));
+        X[i] = x;
+        Y[i] = sinf(x);
+    }
 }
 
 /*
@@ -408,13 +442,271 @@ static void test_multi_class_classification() {
     free(b2_data);
 }
 
+/*
+ * Test 3.2: Regression (Sine Function)
+ *
+ * Validates that the network can approximate y = sin(x) over [-π, π]
+ * with MSE < 0.01 after 500 epochs of training.
+ */
+static void test_regression_sine() {
+    printf("\n");
+    printf("================================================================================\n");
+    printf("Test 3.2: Regression (Sine Function)\n");
+    printf("================================================================================\n");
+    printf("Dataset: 50 samples uniformly sampled from [-π, π]\n");
+    printf("Network: [1] -> [16] -> [16] -> [1] with ReLU + linear output\n");
+    printf("Loss: MSE loss\n");
+    printf("Optimizer: SGD with lr=%.2f\n", REGRESSION_LEARNING_RATE);
+    printf("Training: %d epochs\n", REGRESSION_EPOCHS);
+    printf("Success Criterion: Final MSE < %.4f\n", REGRESSION_MSE_THRESHOLD);
+    printf("================================================================================\n\n");
+
+    /* Allocate dataset */
+    float* X = (float*)malloc(REGRESSION_NUM_SAMPLES * REGRESSION_INPUT_DIM * sizeof(float));
+    float* Y = (float*)malloc(REGRESSION_NUM_SAMPLES * REGRESSION_OUTPUT_DIM * sizeof(float));
+
+    assert(X != NULL && Y != NULL);
+
+    /* Generate dataset */
+    printf("Generating dataset...\n");
+    srand(42);  /* Reproducibility */
+    generate_sine_dataset(X, Y);
+
+    /* Print sample points */
+    printf("Sample training points:\n");
+    for (int i = 0; i < REGRESSION_NUM_SAMPLES; i += 10) {
+        printf("  x=%.4f, sin(x)=%.4f\n", X[i], Y[i]);
+    }
+    printf("\n");
+
+    /* Allocate weight and bias tensors for 3-layer network */
+    float* W1_data = (float*)malloc(REGRESSION_INPUT_DIM * REGRESSION_HIDDEN_DIM * sizeof(float));
+    float* b1_data = (float*)malloc(REGRESSION_HIDDEN_DIM * sizeof(float));
+    float* W2_data = (float*)malloc(REGRESSION_HIDDEN_DIM * REGRESSION_HIDDEN_DIM * sizeof(float));
+    float* b2_data = (float*)malloc(REGRESSION_HIDDEN_DIM * sizeof(float));
+    float* W3_data = (float*)malloc(REGRESSION_HIDDEN_DIM * REGRESSION_OUTPUT_DIM * sizeof(float));
+    float* b3_data = (float*)malloc(REGRESSION_OUTPUT_DIM * sizeof(float));
+
+    assert(W1_data && b1_data && W2_data && b2_data && W3_data && b3_data);
+
+    /* Initialize weights and biases */
+    init_weights_xavier(W1_data, REGRESSION_INPUT_DIM, REGRESSION_HIDDEN_DIM);
+    init_bias_zero(b1_data, REGRESSION_HIDDEN_DIM);
+    init_weights_xavier(W2_data, REGRESSION_HIDDEN_DIM, REGRESSION_HIDDEN_DIM);
+    init_bias_zero(b2_data, REGRESSION_HIDDEN_DIM);
+    init_weights_xavier(W3_data, REGRESSION_HIDDEN_DIM, REGRESSION_OUTPUT_DIM);
+    init_bias_zero(b3_data, REGRESSION_OUTPUT_DIM);
+
+    printf("Network initialized with Xavier weights and zero biases\n\n");
+
+    /* Create computation graph */
+    tl_graph* g = tl_graph_create();
+    assert(g != NULL);
+
+    /* Create parameter tensors */
+    tl_tensor* t_W1 = tl_tensor_create(W1_data, 2, (int[]){REGRESSION_INPUT_DIM, REGRESSION_HIDDEN_DIM}, TL_FLOAT);
+    tl_tensor* t_b1 = tl_tensor_create(b1_data, 1, (int[]){REGRESSION_HIDDEN_DIM}, TL_FLOAT);
+    tl_tensor* t_W2 = tl_tensor_create(W2_data, 2, (int[]){REGRESSION_HIDDEN_DIM, REGRESSION_HIDDEN_DIM}, TL_FLOAT);
+    tl_tensor* t_b2 = tl_tensor_create(b2_data, 1, (int[]){REGRESSION_HIDDEN_DIM}, TL_FLOAT);
+    tl_tensor* t_W3 = tl_tensor_create(W3_data, 2, (int[]){REGRESSION_HIDDEN_DIM, REGRESSION_OUTPUT_DIM}, TL_FLOAT);
+    tl_tensor* t_b3 = tl_tensor_create(b3_data, 1, (int[]){REGRESSION_OUTPUT_DIM}, TL_FLOAT);
+
+    assert(t_W1 && t_b1 && t_W2 && t_b2 && t_W3 && t_b3);
+
+    /* Create trainable parameters */
+    tl_graph_node* p_W1 = tl_graph_param(g, t_W1);
+    tl_graph_node* p_b1 = tl_graph_param(g, t_b1);
+    tl_graph_node* p_W2 = tl_graph_param(g, t_W2);
+    tl_graph_node* p_b2 = tl_graph_param(g, t_b2);
+    tl_graph_node* p_W3 = tl_graph_param(g, t_W3);
+    tl_graph_node* p_b3 = tl_graph_param(g, t_b3);
+
+    assert(p_W1 && p_b1 && p_W2 && p_b2 && p_W3 && p_b3);
+
+    /* Create optimizer */
+    tl_optimizer* opt = tl_optimizer_sgd_create(g, REGRESSION_LEARNING_RATE);
+    assert(opt != NULL);
+
+    /* Manually add parameters to optimizer */
+    tl_optimizer_add_param(opt, p_W1);
+    tl_optimizer_add_param(opt, p_b1);
+    tl_optimizer_add_param(opt, p_W2);
+    tl_optimizer_add_param(opt, p_b2);
+    tl_optimizer_add_param(opt, p_W3);
+    tl_optimizer_add_param(opt, p_b3);
+
+    printf("Starting training...\n");
+    printf("Epoch | MSE Loss\n");
+    printf("------|----------\n");
+
+    /* Training loop */
+    float min_mse = 1e9f;
+    int best_epoch = 0;
+
+    for (int epoch = 0; epoch < REGRESSION_EPOCHS; epoch++) {
+        float epoch_loss = 0.0f;
+
+        /* Iterate over all samples */
+        for (int sample_idx = 0; sample_idx < REGRESSION_NUM_SAMPLES; sample_idx++) {
+            /* Clear the graph for new forward pass */
+            tl_graph_clear_ops(g);
+
+            /* Get single sample and label */
+            float* x_sample = &X[sample_idx * REGRESSION_INPUT_DIM];
+            float* y_sample = &Y[sample_idx * REGRESSION_OUTPUT_DIM];
+
+            /* Create input tensor: reshape to (1,) */
+            tl_tensor* t_x = tl_tensor_create(x_sample, 1, (int[]){REGRESSION_INPUT_DIM}, TL_FLOAT);
+            tl_tensor* t_y = tl_tensor_create(y_sample, 1, (int[]){REGRESSION_OUTPUT_DIM}, TL_FLOAT);
+
+            assert(t_x && t_y);
+
+            /* Create input nodes */
+            tl_graph_node* x = tl_graph_input(g, t_x);
+            tl_graph_node* y_true = tl_graph_input(g, t_y);
+
+            /* Forward pass: h1 = relu(x @ W1 + b1) */
+            tl_graph_node* xW1 = tl_graph_matmul(g, x, p_W1);
+            tl_graph_node* xW1_b1 = tl_graph_add(g, xW1, p_b1);
+            tl_graph_node* h1 = tl_graph_relu(g, xW1_b1);
+
+            /* h2 = relu(h1 @ W2 + b2) */
+            tl_graph_node* h1W2 = tl_graph_matmul(g, h1, p_W2);
+            tl_graph_node* h1W2_b2 = tl_graph_add(g, h1W2, p_b2);
+            tl_graph_node* h2 = tl_graph_relu(g, h1W2_b2);
+
+            /* Output (linear, no activation): pred = h2 @ W3 + b3 */
+            tl_graph_node* h2W3 = tl_graph_matmul(g, h2, p_W3);
+            tl_graph_node* pred = tl_graph_add(g, h2W3, p_b3);
+
+            /* Compute MSE loss */
+            tl_graph_node* loss_node = tl_graph_mse_loss(g, pred, y_true);
+
+            /* Extract loss value */
+            float loss_val = 0.0f;
+            TL_TENSOR_DATA_TO(loss_node->value, 0, loss_val, TL_FLOAT);
+
+            epoch_loss += loss_val;
+
+            /* Backward pass */
+            tl_graph_zero_grad(g);
+            tl_graph_backward(g, loss_node);
+
+            /* Optimizer step */
+            tl_optimizer_step(opt);
+
+            /* Cleanup for this iteration */
+            tl_tensor_free(t_x);
+            tl_tensor_free(t_y);
+        }
+
+        /* Print training progress */
+        float avg_loss = epoch_loss / REGRESSION_NUM_SAMPLES;
+
+        if ((epoch + 1) % 100 == 0 || epoch < 5) {
+            printf("%5d | %10.6f\n", epoch + 1, avg_loss);
+        }
+
+        /* Track best model */
+        if (avg_loss < min_mse) {
+            min_mse = avg_loss;
+            best_epoch = epoch + 1;
+        }
+    }
+
+    printf("\n");
+    printf("Training Summary:\n");
+    printf("  Best MSE: %.6f at epoch %d\n", min_mse, best_epoch);
+    printf("  Final MSE: %.6f\n", min_mse);
+    printf("\n");
+
+    /* Evaluate on sample points */
+    printf("Final Predictions on Sample Points:\n");
+    printf("----------------------------------\n");
+
+    float eval_points[] = {-PI, -PI / 2.0f, 0.0f, PI / 2.0f, PI};
+    int num_eval_points = sizeof(eval_points) / sizeof(eval_points[0]);
+
+    float total_error = 0.0f;
+
+    for (int i = 0; i < num_eval_points; i++) {
+        tl_graph_clear_ops(g);
+
+        float x_val = eval_points[i];
+        float y_true_val = sinf(x_val);
+
+        tl_tensor* t_x = tl_tensor_create(&x_val, 1, (int[]){REGRESSION_INPUT_DIM}, TL_FLOAT);
+        assert(t_x);
+
+        tl_graph_node* x = tl_graph_input(g, t_x);
+
+        /* Forward pass through 3-layer network */
+        tl_graph_node* xW1 = tl_graph_matmul(g, x, p_W1);
+        tl_graph_node* xW1_b1 = tl_graph_add(g, xW1, p_b1);
+        tl_graph_node* h1 = tl_graph_relu(g, xW1_b1);
+
+        tl_graph_node* h1W2 = tl_graph_matmul(g, h1, p_W2);
+        tl_graph_node* h1W2_b2 = tl_graph_add(g, h1W2, p_b2);
+        tl_graph_node* h2 = tl_graph_relu(g, h1W2_b2);
+
+        tl_graph_node* h2W3 = tl_graph_matmul(g, h2, p_W3);
+        tl_graph_node* pred = tl_graph_add(g, h2W3, p_b3);
+
+        float pred_val = 0.0f;
+        TL_TENSOR_DATA_TO(pred->value, 0, pred_val, TL_FLOAT);
+
+        float error = fabsf(pred_val - y_true_val);
+        total_error += error;
+
+        printf("  x=%.4f: pred=%.4f, actual=%.4f, error=%.4f\n", x_val, pred_val, y_true_val, error);
+
+        tl_tensor_free(t_x);
+    }
+
+    float avg_error = total_error / num_eval_points;
+    printf("\n");
+    printf("Average prediction error: %.6f\n", avg_error);
+
+    printf("\n");
+    printf("================================================================================\n");
+
+    /* Verify success criterion */
+    if (min_mse < REGRESSION_MSE_THRESHOLD) {
+        printf("PASS: Final MSE %.6f < %.6f\n", min_mse, REGRESSION_MSE_THRESHOLD);
+        printf("================================================================================\n\n");
+    } else {
+        printf("FAIL: Final MSE %.6f >= %.6f\n", min_mse, REGRESSION_MSE_THRESHOLD);
+        printf("================================================================================\n\n");
+    }
+
+    /* Cleanup */
+    tl_graph_free(g);
+    tl_tensor_free(t_W1);
+    tl_tensor_free(t_b1);
+    tl_tensor_free(t_W2);
+    tl_tensor_free(t_b2);
+    tl_tensor_free(t_W3);
+    tl_tensor_free(t_b3);
+    tl_optimizer_free(opt);
+
+    free(X);
+    free(Y);
+    free(W1_data);
+    free(b1_data);
+    free(W2_data);
+    free(b2_data);
+    free(W3_data);
+    free(b3_data);
+}
+
 int main() {
     printf("\n");
     printf("╔════════════════════════════════════════════════════════════════════════════════╗\n");
-    printf("║           Tofu Validation Test Suite Phase 3: Multi-Class Classification       ║\n");
+    printf("║      Tofu Validation Test Suite Phase 3: Classification & Regression           ║\n");
     printf("╚════════════════════════════════════════════════════════════════════════════════╝\n");
 
     test_multi_class_classification();
+    test_regression_sine();
 
     printf("Test suite completed.\n");
 
