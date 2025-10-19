@@ -1,6 +1,6 @@
 # Tofu v1.0.0 Release Roadmap
 
-**Current Version**: v0.3.0 (Milestone 1 Complete: Core Completeness)
+**Current Version**: v0.5.0 (Milestone 3 Complete: Robustness & Quality)
 **Target**: v1.0.0 - Production-ready deep learning framework for embedded systems
 
 ---
@@ -75,13 +75,13 @@ A v1.0.0 release signals:
 **Gradient Checking** ✅ COMPLETE:
 - ✅ All implemented operations validated (mul, transpose, layer_norm, MSE, CE)
 
-**Additional Tests Still Needed** (HIGH PRIORITY):
-- ⏳ Edge cases: zero inputs, NaN/Inf handling, extreme values
-- ⏳ Memory leak tests (valgrind/sanitizers)
-- ⏳ Thread safety tests (if claiming thread-safe)
-- ⏳ Large model tests (memory efficiency, 100M+ parameters)
+**Additional Tests** (v0.5.0 Update):
+- ✅ Edge cases: zero inputs, NaN/Inf handling, extreme values (7 tests)
+- ✅ Memory safety tests (AddressSanitizer verified - zero errors)
+- ⏳ Thread safety tests (if claiming thread-safe) - deferred to v1.1
+- ⏳ Large model tests (memory efficiency, 100M+ parameters) - deferred to v1.1
 
-**Estimated remaining effort**: 2-3 days
+**Status**: Core testing complete for v1.0.0
 
 ---
 
@@ -112,13 +112,13 @@ A v1.0.0 release signals:
 
 ### 4. Examples & Benchmarks (HIGH PRIORITY)
 
-**Production-Ready Examples**:
+**Production-Ready Examples** (v0.4.0 Update):
 - ✅ MLP (MNIST-style)
 - ✅ Vision Transformer (ViT)
-- ⏳ CNN (convolutional networks)
-- ⏳ ResNet-like architecture (using validated residual blocks)
-- ⏳ LSTM/RNN (recurrent networks)
-- ⏳ Fine-tuning example (transfer learning)
+- ✅ CNN (8x8 pattern recognition, 100% accuracy)
+- ✅ ResNet-like architecture (residual blocks with skip connections, 100% accuracy)
+- ⏳ LSTM/RNN (recurrent networks) - deferred to v1.1
+- ⏳ Fine-tuning example (transfer learning) - deferred to v1.1
 
 **Benchmarks**:
 - ⏳ Performance benchmarks (ops/sec, FLOPS)
@@ -156,14 +156,15 @@ A v1.0.0 release signals:
 - ⏳ macOS build tested
 - ⏳ pkg-config support verified
 
-**CI/CD**:
-- ⏳ GitHub Actions for automated testing
-- ⏳ Build on multiple platforms (Linux, macOS, Windows)
-- ⏳ Valgrind/AddressSanitizer in CI
-- ⏳ Test coverage reporting
-- ⏳ Automated releases
+**CI/CD** (v0.4.0 / v0.5.0 Update):
+- ✅ GitHub Actions for automated testing
+- ✅ Build on multiple platforms (Linux, macOS)
+- ✅ AddressSanitizer verified locally (zero errors)
+- ⏳ Windows build support - deferred to v0.9.0
+- ⏳ Test coverage reporting - optional for v1.0
+- ⏳ Automated releases - optional for v1.0
 
-**Estimated effort**: 2-3 days
+**Status**: Core CI/CD complete
 
 ---
 
