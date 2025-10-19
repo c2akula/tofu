@@ -14,9 +14,9 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
-#include "src/tl_tensor.h"
-#include "src/tl_graph.h"
-#include "src/tl_optimizer.h"
+#include "tl_tensor.h"
+#include "tl_graph.h"
+#include "tl_optimizer.h"
 
 #define INPUT_SIZE 8
 #define HIDDEN_SIZE 16
