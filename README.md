@@ -1,6 +1,6 @@
 # Tofu
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.5.0-blue)
 ![Tests](https://img.shields.io/badge/tests-13%2F13%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20ESP32-lightgrey)
@@ -51,7 +51,7 @@ See [examples/](examples/) for complete training examples including MLP, ViT, an
 
 ## Error Handling & Limitations
 
-**Current Behavior (v0.4.0)**:
+**Current Behavior (v0.5.0)**:
 - Tofu uses `assert()` for parameter validation and error detection
 - Invalid inputs (NULL pointers, mismatched dimensions, NaN/Inf) will **trigger assertions and crash**
 - This is **intentional** for development/debugging - crashes provide immediate feedback

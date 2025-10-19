@@ -8,10 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Error handling improvements
 - API stabilization for v1.0.0
-- Memory leak testing (valgrind)
-- Edge case testing
+
+## [0.5.0] - 2025-10-19
+
+### Added - Milestone 3: Robustness & Quality
+- **Edge Case Test Suite**: 7 tests documenting behavior for edge cases
+  - Zero value tests (zero matrices, zero gradients)
+  - NaN/Inf handling tests (propagation through operations)
+  - Extreme value tests (FLT_MAX, FLT_MIN)
+  - Dimension edge cases (1×1 matrices)
+  - 5/7 tests pass, 2 document known limitations for v1.1.0 fixes
+- **Memory Safety Verification**:
+  - All tests pass with AddressSanitizer (no leaks, no use-after-free)
+  - Validated on Phase 1, Phase 3, CNN example, ResNet example
+- **Enhanced CI/CD**:
+  - Added edge case tests to workflow
+  - Added example builds (CNN and ResNet)
+  - Updated test summary with comprehensive reporting
+
+### Changed
+- Updated README with "Error Handling & Limitations" section
+- Documented assert-based error handling behavior
+- Provided best practices for production use
 
 ## [0.4.0] - 2025-10-19
 

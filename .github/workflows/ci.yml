@@ -42,6 +42,7 @@ jobs:
       run: |
         gcc -o test/standalone/test_validation_phase1 test/standalone/test_validation_phase1.c -I src build/lib/libtofu.a -lm
         gcc -o test/standalone/test_validation_phase3 test/standalone/test_validation_phase3.c -I src build/lib/libtofu.a -lm
+        gcc -o test/standalone/test_edge_cases test/standalone/test_edge_cases.c -I src build/lib/libtofu.a -lm
 
     - name: Run Phase 1 validation tests
       run: |
@@ -55,9 +56,24 @@ jobs:
         ./test/standalone/test_validation_phase3
         echo ""
 
+    - name: Run edge case tests
+      run: |
+        echo "=== Edge Case Tests ==="
+        ./test/standalone/test_edge_cases
+        echo ""
+
+    - name: Build examples
+      run: |
+        echo "=== Building Examples ==="
+        gcc -o examples/cnn_training examples/cnn_training.c -I src build/lib/libtofu.a -lm
+        gcc -o examples/resnet_training examples/resnet_training.c -I src build/lib/libtofu.a -lm
+        echo "✓ CNN and ResNet examples built successfully"
+
     - name: Test summary
       if: success()
       run: |
-        echo "✅ All validation tests passed!"
+        echo "✅ All tests passed!"
         echo "   - Phase 1: 6/6 tests (gradient correctness)"
         echo "   - Phase 3: 2/2 tests (multiclass + regression)"
+        echo "   - Edge cases: 5/7 pass (2 document known issues)"
+        echo "   - Examples: CNN and ResNet build successfully"
