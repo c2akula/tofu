@@ -101,7 +101,7 @@ TOFU_CPPSTART
  * @brief Create a new empty computation graph
  * @return Pointer to newly allocated graph (caller owns, must call tofu_graph_free)
  * @note Graph starts empty - add nodes via tofu_graph_input, tofu_graph_param, etc.
- * @note Graph takes ownership of tensors passed to tofu_graph_param
+ * @note Graph does NOT take ownership of tensors passed to tofu_graph_param
  * @note Caller must call tofu_graph_free to free graph and all nodes
  */
 TOFU_EXPORT tofu_graph* tofu_graph_create(void);
