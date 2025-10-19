@@ -57,47 +57,47 @@ None - all critical issues resolved!
 
 ---
 
-## ⚠️ Optional Improvements
+## ✅ Optional Improvements (Completed)
 
 ### 4. **docs/src/api-reference/tensor-api.md** - View Operation Warning
 
-**Location**: Lines ~387-403 (tofu_tensor_reshape)
+**Location**: Lines 389-395 (tofu_tensor_reshape)
 
-**Suggestion**: Add explicit warning about NOT calling `tofu_tensor_free_data_too` on views
-
-**Proposed addition**:
+**Improvement Applied**: Added explicit warning about NOT calling `tofu_tensor_free_data_too` on views:
 ```markdown
-**Warning:** Do NOT call `tofu_tensor_free_data_too` on a view - this would free
-the shared data while the source tensor still references it! Only use `tofu_tensor_free`.
+**Warning:** Do NOT call `tofu_tensor_free_data_too` on the reshaped view - this would free
+the shared data while the source tensor still references it! Only use `tofu_tensor_free` on views.
 ```
+
+**Status**: ✅ APPLIED
 
 ---
 
 ### 5. **docs/src/api-reference/graph-api.md** - Reshape as View Operation
 
-**Location**: Line ~540
+**Location**: Line 540
 
-**Suggestion**: Clarify that reshaped tensors share data
+**Improvement Applied**: Clarified that reshaped tensors share data with input:
+```markdown
+View operation (no data copy) - reshaped tensor shares data with input
+```
 
-**Current**: "View operation (no data copy)"
-
-**Proposed**: "View operation (no data copy) - reshaped tensor shares data with input"
+**Status**: ✅ APPLIED
 
 ---
 
 ### 6. **docs/src/api-reference/graph-api.md** - Gradient Accumulation
 
-**Location**: Lines ~686-688
+**Location**: Lines 687-688
 
-**Suggestion**: Expand explanation of when gradients accumulate
-
-**Proposed addition**:
+**Improvement Applied**: Expanded explanation of gradient accumulation behavior:
 ```markdown
-Gradients accumulate across multiple backward passes and from multiple
-computational paths. Always call tofu_graph_zero_grad before each training
-iteration unless you intentionally want gradient accumulation (e.g., for
-gradient accumulation across mini-batches).
+Gradients accumulate across multiple backward passes and from multiple computational paths.
+Always call tofu_graph_zero_grad before each training iteration unless you intentionally
+want gradient accumulation (e.g., for gradient accumulation across mini-batches).
 ```
+
+**Status**: ✅ APPLIED
 
 ---
 

@@ -537,7 +537,7 @@ tofu_graph_node* tofu_graph_reshape(tofu_graph* g, tofu_graph_node* x, int ndim,
 - Product of dims must equal `x->value` total elements
 
 **Behavior:**
-- View operation (no data copy)
+- View operation (no data copy) - reshaped tensor shares data with input
 - Implements backward pass for gradient computation
 
 **Example:**
@@ -684,7 +684,8 @@ void tofu_graph_backward(tofu_graph* g, tofu_graph_node* loss);
 - Populates `node->grad` for all PARAM nodes
 - Uses reverse-mode automatic differentiation
 - Call after forward pass, before optimizer step
-- Gradients accumulate - call `tofu_graph_zero_grad` first if needed
+- Gradients accumulate across multiple backward passes and from multiple computational paths
+- Always call `tofu_graph_zero_grad` before each training iteration unless you intentionally want gradient accumulation (e.g., for gradient accumulation across mini-batches)
 
 **Example:**
 ```c

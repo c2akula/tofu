@@ -392,6 +392,8 @@ tofu_tensor *tofu_tensor_reshape(tofu_tensor *src, int ndim, const int *dims);
 - Source must outlive result tensor
 - Product of dims must equal `tofu_tensor_size(src)`
 
+**Warning:** Do NOT call `tofu_tensor_free_data_too` on the reshaped view - this would free the shared data while the source tensor still references it! Only use `tofu_tensor_free` on views.
+
 **Example:**
 ```c
 tofu_tensor *t = tofu_tensor_zeros(1, (int[]){12}, TOFU_FLOAT);
