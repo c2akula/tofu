@@ -136,8 +136,8 @@ tofu_optimizer* tofu_optimizer_sgd_momentum_create(tofu_graph* g, double learnin
 
 **Behavior:**
 - Implements SGD with momentum:
-  - `velocity = momentum * velocity + grad`
-  - `param = param - learning_rate * velocity`
+  - `velocity = momentum * velocity - learning_rate * grad`
+  - `param = param + velocity`
 - Momentum helps accelerate training and reduces oscillations
 - Automatically collects all PARAM nodes from graph
 - Caller must call `tofu_optimizer_free` to free optimizer
@@ -145,13 +145,17 @@ tofu_optimizer* tofu_optimizer_sgd_momentum_create(tofu_graph* g, double learnin
 **Algorithm:**
 ```
 for each parameter θ:
-    v ← μ * v + ∇θL
-    θ ← θ - η * v
+    v ← μ * v - η * ∇θL
+    θ ← θ + v
 where:
     η = learning_rate
     μ = momentum
     v = velocity (accumulated gradients)
     ∇θL = gradient of loss w.r.t. parameter
+
+Note: This is mathematically equivalent to classical momentum
+(v = μ*v + ∇θL, θ = θ - η*v) but incorporates the learning
+rate into the velocity update rather than the parameter update.
 ```
 
 **Example:**

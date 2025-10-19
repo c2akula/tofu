@@ -583,7 +583,8 @@ tofu_tensor *tofu_tensor_matmul(const tofu_tensor *src1, const tofu_tensor *src2
 **Returns:** Result tensor (caller owns if dst was NULL)
 
 **Preconditions:**
-- `src1->dims[src1->ndim-1]` must equal `src2->dims[src2->ndim-2]`
+- For 1-D @ 1-D: `src1->dims[0]` must equal `src2->dims[0]`
+- For 2-D and higher: `src1->dims[src1->ndim-1]` must equal `src2->dims[src2->ndim-2]`
 
 **Behavior:**
 - **1-D @ 1-D**: Dot product → scalar

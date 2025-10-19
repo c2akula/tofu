@@ -11,44 +11,30 @@
 - **Status**: ✅ FIXED
 - **Commit**: Needs to be committed
 
-## ❌ Pending Fixes
-
 ### 2. **docs/src/api-reference/tensor-api.md** - Matmul Precondition
 
-**Location**: Line ~586
+**Location**: Line 586
 
-**Current (INCORRECT)**:
-```markdown
-**Preconditions:**
-- `src1->dims[src1->ndim-1]` must equal `src2->dims[src2->ndim-2]`
-```
+**Issue**: Precondition formula invalid for 1-D tensors (out of bounds access)
 
-**Should be**:
+**Fix Applied**: Split precondition into 1-D case and 2-D+ case:
 ```markdown
 **Preconditions:**
 - For 1-D @ 1-D: `src1->dims[0]` must equal `src2->dims[0]`
 - For 2-D and higher: `src1->dims[src1->ndim-1]` must equal `src2->dims[src2->ndim-2]`
 ```
 
-**Reason**: Original formula is invalid for 1-D tensors (out of bounds access)
+**Status**: ✅ FIXED
 
 ---
 
 ### 3. **docs/src/api-reference/optimizer-api.md** - SGD Momentum Formula
 
-**Location**: Lines ~138-154
+**Location**: Lines 138-154
 
-**Current (DOESN'T MATCH IMPLEMENTATION)**:
-```markdown
-velocity = momentum * velocity + grad
-param = param - learning_rate * velocity
+**Issue**: Formula didn't match actual implementation in `tofu_optimizer.c:139-151`
 
-Mathematical notation:
-v ← μ * v + ∇θL
-θ ← θ - η * v
-```
-
-**Should be (MATCHES ACTUAL CODE)**:
+**Fix Applied**: Updated to match implementation with explanatory note:
 ```markdown
 velocity = momentum * velocity - learning_rate * grad
 param = param + velocity
@@ -61,14 +47,13 @@ Note: This is mathematically equivalent to classical momentum but incorporates
 the learning rate into the velocity update rather than the parameter update.
 ```
 
-**Reason**: Implementation in `tofu_optimizer.c:139-151` uses a different (but equivalent) formulation
+**Status**: ✅ FIXED
 
-**Source code reference**:
-```c
-/* Update velocity: v = momentum * v - lr * grad */
-vel_val = state->momentum * vel_val - opt->learning_rate * grad_val;
-param_val += vel_val;
-```
+---
+
+## ❌ Pending Fixes
+
+None - all critical issues resolved!
 
 ---
 
