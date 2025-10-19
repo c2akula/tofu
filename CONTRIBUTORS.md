@@ -6,14 +6,20 @@ This project is a derivative work based on TensorLight, with substantial modific
 
 **Zhao Zhixu** (2018-2020)
 - Created TensorLight, the original tensor computation library
-- Core tensor operations and graph infrastructure
-- Original build system
+- Core tensor operations (basic forward passes)
+- Original build system foundation
 
 ## Tofu Development (2025)
 
 **[Your Name/Organization]**
 
 Major contributions and enhancements:
+- **Dynamic Computation Graph**: Complete graph infrastructure implementation
+  - Graph nodes with forward/backward pass tracking
+  - Parameter management and gradient accumulation
+  - Graph traversal for automatic differentiation
+  - Memory-efficient graph operations
+
 - **Automatic Differentiation**: Implemented backward passes for all essential operations
   - Element-wise multiply (MUL) gradient
   - Transpose gradient with permutation handling
@@ -57,7 +63,7 @@ Major contributions and enhancements:
 
 ## Acknowledgments
 
-We are grateful to Zhao Zhixu for creating TensorLight, which provided the foundation for Tofu. The original architecture and design decisions enabled rapid development of automatic differentiation and validation infrastructure.
+We are grateful to Zhao Zhixu for creating TensorLight, which provided the foundational tensor operations that Tofu builds upon. The original tensor computation library served as a starting point for developing the complete deep learning framework.
 
 ## Contributing
 

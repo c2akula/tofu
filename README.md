@@ -327,14 +327,16 @@ Additional documentation is coming soon. But the API should be familiar if you h
 
 ## Acknowledgments
 
-**Tofu** is a derivative work based on [TensorLight](https://github.com/zhaozhixu/TensorLight) by Zhao Zhixu (2018-2020). We are grateful for the original project, which provided the foundational tensor computation library and graph infrastructure.
+**Tofu** is a derivative work based on [TensorLight](https://github.com/zhaozhixu/TensorLight) by Zhao Zhixu (2018-2020). We are grateful for the original project, which provided the foundational tensor computation library.
 
 **Major Enhancements (2025)**:
-- Complete automatic differentiation implementation (all operation gradients)
+- Dynamic computation graph infrastructure with automatic differentiation
+- Complete backward pass implementation (all operation gradients)
 - Comprehensive validation suite (13+ tests with numerical verification)
 - CI/CD pipeline with multi-platform testing
 - Memory safety verification (AddressSanitizer)
 - Production-ready examples (CNN, ResNet)
+- ESP32 cross-compilation support
 - Edge case testing and documentation
 
 See [CONTRIBUTORS.md](CONTRIBUTORS.md) for detailed attribution.
