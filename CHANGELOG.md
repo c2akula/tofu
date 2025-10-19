@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - API stabilization for v1.0.0
 
+### Changed
+- Updated LICENSE to reflect dual copyright (original TensorLight + Tofu modifications)
+- Added CONTRIBUTORS.md documenting project history and contributions
+- Added Acknowledgments section to README
+
 ## [0.5.0] - 2025-10-19
 
 ### Added - Milestone 3: Robustness & Quality

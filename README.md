@@ -324,3 +324,17 @@ tl_tensor *result = tl_tensor_matmul(m1, m2, dst);
 This avoids memory allocation overhead in performance-critical loops.
 
 Additional documentation is coming soon. But the API should be familiar if you have experience with `numpy` in Python.
+
+## Acknowledgments
+
+**Tofu** is a derivative work based on [TensorLight](https://github.com/zhaozhixu/TensorLight) by Zhao Zhixu (2018-2020). We are grateful for the original project, which provided the foundational tensor computation library and graph infrastructure.
+
+**Major Enhancements (2025)**:
+- Complete automatic differentiation implementation (all operation gradients)
+- Comprehensive validation suite (13+ tests with numerical verification)
+- CI/CD pipeline with multi-platform testing
+- Memory safety verification (AddressSanitizer)
+- Production-ready examples (CNN, ResNet)
+- Edge case testing and documentation
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for detailed attribution.
