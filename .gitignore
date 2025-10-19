@@ -21,6 +21,9 @@ examples/deep_network
 examples/test_activations
 examples/stress_test
 examples/deep_network_diagnostic
+examples/xor_training
+examples/*_asan
+examples/*.dSYM
 
 # Test executables and outputs
 test_*
