@@ -49,6 +49,28 @@ tl_graph_free(g);
 
 See [examples/](examples/) for complete training examples including MLP, ViT, and more.
 
+## Error Handling & Limitations
+
+**Current Behavior (v0.4.0)**:
+- Tofu uses `assert()` for parameter validation and error detection
+- Invalid inputs (NULL pointers, mismatched dimensions, NaN/Inf) will **trigger assertions and crash**
+- This is **intentional** for development/debugging - crashes provide immediate feedback
+
+**Known Limitations**:
+- No graceful error recovery - asserts will terminate the program
+- Limited input validation - assumes well-formed data
+- Float32 precision: ~7 decimal digits (see [VALIDATION_PLAN.md](VALIDATION_PLAN.md) for precision handling)
+
+**Best Practices**:
+1. **Validate dimensions** before calling Tofu operations
+2. **Check for NaN/Inf** in your data if using untrusted inputs
+3. **Use debug builds** during development (`-g` flag)
+4. **Test with sanitizers** (AddressSanitizer, UndefinedBehaviorSanitizer) to catch issues early
+
+**Roadmap**:
+- v1.0.0: Document all edge cases with regression tests
+- v1.1.0+: Graceful error handling with return codes (breaking change)
+
 ## Prerequisites
 The following steps have been tested for Ubuntu 16.04 but should work with
 other distros as well. 
