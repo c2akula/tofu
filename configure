@@ -9,8 +9,8 @@ use lib 'tools/buildtools';
 use ConfigUtil;
 
 # version number
-my $major = 0;
-my $minor = 9;
+my $major = 1;
+my $minor = 0;
 my $micro = 0;
 
 # project specified make variables

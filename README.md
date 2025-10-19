@@ -1,11 +1,14 @@
 # Tofu
 
-![Version](https://img.shields.io/badge/version-0.9.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![API Status](https://img.shields.io/badge/API-stable-green)
 ![Tests](https://img.shields.io/badge/tests-13%2F13%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20ESP32-lightgrey)
 
 **Tofu** is a lightweight deep learning framework for C, designed for embedded systems and environments where Python frameworks aren't available. It features automatic differentiation, dynamic computation graphs, and comprehensive validation across diverse neural network architectures.
+
+**🎉 v1.0.0 Released!** First stable release with frozen public API. All `tofu_*` functions now follow strict semantic versioning guarantees. See [API_STABILITY.md](API_STABILITY.md) for details.
 
 **Key Features:**
 - 🧠 **Automatic Differentiation**: Dynamic computation graphs with backward pass

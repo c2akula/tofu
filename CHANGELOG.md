@@ -8,8 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Phase 3: Performance benchmarks (deferred to v1.1.0)
-- Phase 5: Final polish for v1.0.0 release
+- v1.1.0: Performance benchmarks and optimizations
+- v1.2.0+: Enhanced documentation (mdBook user guide and tutorials)
+
+## [1.0.0] - 2025-10-19
+
+**🎉 First Stable Release - API Freeze**
+
+This is the first stable release of Tofu with a **frozen public API**. All public functions (`tofu_*`) are now stable and follow semantic versioning guarantees.
+
+### API Stability Commitment
+- **Public API is FROZEN**: No breaking changes without major version bump
+- **Semantic Versioning**: MAJOR.MINOR.PATCH strictly enforced
+- **Deprecation Policy**: One major version warning period for any removals
+- See [API_STABILITY.md](API_STABILITY.md) for full stability guarantees
+
+### What's Included in v1.0.0
+- **14 Core Operations**: matmul, add, mul, relu, softmax, layer_norm, reshape, transpose, mean, sum, MSE loss, cross-entropy loss
+- **3 Optimizers**: SGD, SGD with momentum, Adam
+- **Automatic Differentiation**: Full backward pass for all operations
+- **Comprehensive Documentation**: 70+ functions with Doxygen comments
+- **Production Ready**: 13/13 tests passing, 100% accuracy on CNN and ResNet examples
+- **Platform Support**: Linux, macOS (fully tested), ESP32 (build support)
+- **Memory Safe**: Verified with AddressSanitizer, no leaks
+
+### Known Limitations (to be addressed in v1.1.0+)
+- Performance benchmarks not yet established
+- Some edge cases in broadcasting (documented with TODOs)
+- Limited slice functionality (start < stop only)
+
+### Migration from v0.9.0
+- No breaking changes - v0.9.0 code works with v1.0.0
+- API is identical, only version number changed
 
 ## [0.9.0] - 2025-10-19
 
@@ -155,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 63+ initial tests
 - MLP and ViT examples
 
-[Unreleased]: https://github.com/username/tofu/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/username/tofu/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/username/tofu/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/username/tofu/compare/v0.5.0...v0.9.0
 [0.5.0]: https://github.com/username/tofu/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/username/tofu/compare/v0.3.0...v0.4.0
