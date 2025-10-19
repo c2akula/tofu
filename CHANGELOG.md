@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - API stabilization for v1.0.0
 
-### Added - Milestone 4: API Stabilization (Phase 2)
+### Added - Milestone 4: API Stabilization
+**Phase 2: API Documentation**
 - **Comprehensive API Documentation**: Added Doxygen comments to all public functions
   - `tofu_tensor.h`: 40+ functions with detailed preconditions, ownership semantics, and cross-references
   - `tofu_graph.h`: 20+ graph operations with gradient computation details
@@ -21,6 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Public API definition and stability guarantees
   - Deprecation policy (one major version warning period)
   - Breaking change request process
+
+**Phase 4: Build System Verification**
+- **Platform Support Documentation**: Added comprehensive platform support table in README
+  - Linux (Ubuntu 20.04+): Fully supported with CI/CD
+  - macOS (13+): Fully supported with CI/CD
+  - ESP32: Build support verified, cross-compilation documented
+  - Build requirements and toolchain specifications documented
+
+### Fixed
+- **Critical Documentation Error**: Corrected ownership semantics in API documentation
+  - Fixed `tofu_graph_param()` and `tofu_graph_input()` - caller owns tensors, not graph
+  - Updated `tofu_graph_free()` to clarify what is/isn't freed
+  - Corrected all tensor creation functions regarding graph ownership
+  - Documentation now matches actual implementation behavior
 
 ### Changed - BREAKING
 - **API Rename**: Changed all API prefixes from `tl_`/`TL_` to `tofu_`/`TOFU_` (Milestone 4: API Stabilization)

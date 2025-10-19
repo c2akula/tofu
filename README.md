@@ -71,6 +71,27 @@ See [examples/](examples/) for complete training examples including MLP, ViT, an
 - v1.0.0: Document all edge cases with regression tests
 - v1.1.0+: Graceful error handling with return codes (breaking change)
 
+## Supported Platforms
+
+| Platform | Build | Tests | CI/CD | Status |
+|----------|-------|-------|-------|--------|
+| **Linux** (Ubuntu 20.04+) | ✅ | ✅ | ✅ | Fully supported |
+| **macOS** (13+) | ✅ | ✅ | ✅ | Fully supported |
+| **ESP32** | ✅ | ⚠️ | ❌ | Build only (no test suite) |
+| **Windows** | ❌ | ❌ | ❌ | Not supported (planned v1.1.0+) |
+
+**Build Requirements:**
+- **Compiler**: GCC 7+ or Clang 10+
+- **Build System**: GNU Make + configure script
+- **Dependencies**: pkg-config, check (for tests)
+- **Optional**: ESP32 toolchain for cross-compilation
+
+**ESP32 Cross-Compilation:**
+```bash
+./configure --esp32=yes --esp32-toolchain-dir=/path/to/toolchain
+make lib
+```
+
 ## Prerequisites
 The following steps have been tested for Ubuntu 16.04 but should work with
 other distros as well. 
