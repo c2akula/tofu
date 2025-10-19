@@ -1042,6 +1042,7 @@ typedef struct {
     float* x_data;
     float* gamma_data;
     float* beta_data;
+    float* weights;  /* Gradient weights for loss computation */
     int batch_size;
     int feature_dim;
 } layer_norm_context;
@@ -1065,12 +1066,13 @@ static float layer_norm_loss_fn(float* param_data, void* ctx) {
     /* Layer norm along axis 1 (normalize features) */
     tl_graph_node* y = tl_graph_layer_norm(g, x, gamma, beta, 1, 1e-5);
 
-    /* Compute scalar loss: sum of all outputs */
+    /* Compute weighted loss matching the backward gradient weights */
     float loss = 0.0f;
     for (int i = 0; i < y->value->len; i++) {
         float val;
         TL_TENSOR_DATA_TO(y->value, i, val, TL_FLOAT);
-        loss += val;
+        float weight = (lnc->weights != NULL) ? lnc->weights[i] : 1.0f;
+        loss += weight * val;
     }
 
     tl_tensor_free(t_x);
@@ -1139,7 +1141,7 @@ static void test_gradient_checking_layer_norm() {
 
     /* === Check gradient w.r.t. input x === */
     printf("  Checking dL/dx (input gradient):\n");
-    layer_norm_context ctx_x = {x_data, gamma_data, beta_data, batch_size, feature_dim};
+    layer_norm_context ctx_x = {x_data, gamma_data, beta_data, (float*)grad_data, batch_size, feature_dim};
     int num_errors_x = 0;
 
     for (int i = 0; i < batch_size * feature_dim; i++) {
@@ -1165,7 +1167,7 @@ static void test_gradient_checking_layer_norm() {
 
     /* === Check gradient w.r.t. scale parameter gamma === */
     printf("  Checking dL/dγ (scale parameter gradient):\n");
-    layer_norm_context ctx_gamma = {x_data, gamma_data, beta_data, batch_size, feature_dim};
+    layer_norm_context ctx_gamma = {x_data, gamma_data, beta_data, (float*)grad_data, batch_size, feature_dim};
     int num_errors_gamma = 0;
 
     for (int i = 0; i < feature_dim; i++) {
@@ -1191,7 +1193,7 @@ static void test_gradient_checking_layer_norm() {
 
     /* === Check gradient w.r.t. bias parameter beta === */
     printf("  Checking dL/dβ (bias parameter gradient):\n");
-    layer_norm_context ctx_beta = {x_data, gamma_data, beta_data, batch_size, feature_dim};
+    layer_norm_context ctx_beta = {x_data, gamma_data, beta_data, (float*)grad_data, batch_size, feature_dim};
     int num_errors_beta = 0;
 
     for (int i = 0; i < feature_dim; i++) {
