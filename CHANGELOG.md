@@ -8,8 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- v1.1.0: Performance benchmarks and optimizations
-- v1.2.0+: Enhanced documentation (mdBook user guide and tutorials)
+- v1.2.0: Performance benchmarks and optimizations
+- v1.3.0+: Enhanced documentation (mdBook user guide and tutorials)
+
+## [1.1.0] - 2025-10-19
+
+**✨ Feature Release - Improved Broadcasting & Slicing**
+
+This release addresses two major limitations from v1.0.0 and enhances core tensor operations.
+
+### Fixed
+- **Broadcasting Gradient Reduction**: Fixed incorrect gradient computation when broadcasting occurs in forward pass
+  - `add_backward()`: Now correctly reduces gradients when shapes differ (e.g., `[3,1] + [3,4]`)
+  - `mul_backward()`: Now correctly reduces gradients when shapes differ (e.g., `[3,1] * [3,4]`)
+  - `matmul_backward()`: Fixed two critical bugs:
+    - Transpose now only swaps matrix dimensions (last 2), not batch dimensions
+    - Added gradient reduction for batch broadcasting (e.g., `[1,3,4] @ [2,4,5]`)
+  - Added `reduce_grad_for_broadcast()` helper function for gradient reduction
+  - Resolves TODO at `src/tofu_graph.c:965`
+
+### Added
+- **Enhanced Slice Functionality**: Full NumPy-compatible slicing with reverse support
+  - `tofu_tensor_arange()`: Now supports negative steps for reverse slicing
+  - `tofu_tensor_rearange()`: Now supports negative steps for reverse slicing
+  - Supports `arange(10, 0, -1)` → `[10, 9, 8, ..., 1]`
+  - Properly handles empty arrays: `arange(5, 5, 1)` → NULL
+  - Properly handles incompatible steps: `arange(0, 10, -1)` → NULL
+  - Resolves TODOs at `src/tofu_tensor.c:161` and `src/tofu_tensor.c:191`
+- **Comprehensive Test Suites**:
+  - `test/standalone/test_broadcast_gradient.c`: 5 broadcast gradient tests
+  - `test/standalone/test_arange_enhanced.c`: 6 test categories with 18+ tests
+
+### Changed
+- Improved numerical stability and correctness for gradient computation
+
+### Performance
+- No performance regressions
+- Minimal overhead for new gradient reduction (only when broadcasting occurs)
 
 ## [1.0.0] - 2025-10-19
 
@@ -185,11 +220,12 @@ This is the first stable release of Tofu with a **frozen public API**. All publi
 - 63+ initial tests
 - MLP and ViT examples
 
-[Unreleased]: https://github.com/username/tofu/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/username/tofu/compare/v0.9.0...v1.0.0
-[0.9.0]: https://github.com/username/tofu/compare/v0.5.0...v0.9.0
-[0.5.0]: https://github.com/username/tofu/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/username/tofu/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/username/tofu/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/username/tofu/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/username/tofu/releases/tag/v0.1.0
+[Unreleased]: https://github.com/c2akula/tofu/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/c2akula/tofu/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/c2akula/tofu/compare/v0.9.0...v1.0.0
+[0.9.0]: https://github.com/c2akula/tofu/compare/v0.5.0...v0.9.0
+[0.5.0]: https://github.com/c2akula/tofu/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/c2akula/tofu/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/c2akula/tofu/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/c2akula/tofu/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/c2akula/tofu/releases/tag/v0.1.0

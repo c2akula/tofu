@@ -171,16 +171,24 @@ tofu_tensor *tofu_tensor_arange(double start, double stop, double step,
                                 tofu_dtype dtype);
 ```
 
-Example:
+Examples:
 
 ```c
+// Forward slicing (positive step)
 tofu_tensor *t = tofu_tensor_arange(0.0, 10.0, 2.0, TOFU_FLOAT);
 // t = [0.0, 2.0, 4.0, 6.0, 8.0]
 
+// Reverse slicing (negative step) - v1.1.0+
+tofu_tensor *r = tofu_tensor_arange(10.0, 0.0, -2.0, TOFU_FLOAT);
+// r = [10.0, 8.0, 6.0, 4.0, 2.0]
+
 tofu_tensor_free_data_too(t);
+tofu_tensor_free_data_too(r);
 ```
 
 **Use when**: Generating test data, indices, or sequences
+
+**Note**: Returns NULL for empty ranges (start == stop) or incompatible step directions (e.g., `arange(0, 10, -1)`)
 
 ### Deep Copy
 

@@ -1,6 +1,6 @@
 # Tofu
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![API Status](https://img.shields.io/badge/API-stable-green)
 ![Tests](https://img.shields.io/badge/tests-13%2F13%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -8,7 +8,7 @@
 
 **Tofu** is a lightweight deep learning framework for C, designed for embedded systems and environments where Python frameworks aren't available. It features automatic differentiation, dynamic computation graphs, and comprehensive validation across diverse neural network architectures.
 
-**🎉 v1.0.0 Released!** First stable release with frozen public API. All `tofu_*` functions now follow strict semantic versioning guarantees. See [API_STABILITY.md](API_STABILITY.md) for details.
+**✨ v1.1.0 Released!** Feature release with improved broadcasting gradient reduction and full NumPy-compatible slicing. All `tofu_*` functions follow strict semantic versioning guarantees. See [API_STABILITY.md](API_STABILITY.md) and [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## 📚 Documentation
 
@@ -65,7 +65,7 @@ See the [online tutorials](https://c2akula.github.io/tofu/tutorials/linear-regre
 
 ## Error Handling & Limitations
 
-**Current Behavior (v0.5.0)**:
+**Current Behavior (v1.1.0)**:
 - Tofu uses `assert()` for parameter validation and error detection
 - Invalid inputs (NULL pointers, mismatched dimensions, NaN/Inf) will **trigger assertions and crash**
 - This is **intentional** for development/debugging - crashes provide immediate feedback

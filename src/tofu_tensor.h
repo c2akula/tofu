@@ -195,13 +195,16 @@ tofu_tensor *tofu_tensor_repeat(const tofu_tensor *src, int times);
  * @brief Create a 1-D tensor with evenly spaced values (similar to NumPy arange)
  * @param start Starting value (inclusive)
  * @param stop Ending value (exclusive)
- * @param step Step size between values
+ * @param step Step size between values (positive or negative)
  * @param dtype Data type for the resulting tensor
- * @return Pointer to newly allocated 1-D tensor (caller owns, must call tofu_tensor_free_data_too)
- * @pre step must not be zero; (stop-start)/step must be positive
- * @note Creates values [start, start+step, start+2*step, ..., stop)
- * @note Number of elements = ceil((stop - start) / step)
- * @note Caller must call tofu_tensor_free_data_too to free result
+ * @return Pointer to newly allocated 1-D tensor, or NULL if range is empty/incompatible
+ * @pre step must not be zero
+ * @note Supports both forward (step > 0) and reverse (step < 0) slicing
+ * @note Forward: requires start < stop, creates [start, start+step, ..., stop)
+ * @note Reverse: requires start > stop, creates [start, start+step, ..., stop) with negative step
+ * @note Returns NULL if start == stop or step direction is incompatible with range
+ * @note Number of elements = ceil((stop - start) / step) when result is non-empty
+ * @note Caller must call tofu_tensor_free_data_too to free non-NULL result
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_tensor_rearange for in-place filling
  */
@@ -212,10 +215,11 @@ tofu_tensor *tofu_tensor_arange(double start, double stop, double step, tofu_dty
  * @param src Tensor to fill (cannot be NULL)
  * @param start Starting value (inclusive)
  * @param stop Ending value (exclusive)
- * @param step Step size between values
+ * @param step Step size between values (positive or negative)
  * @pre src must not be NULL; step must not be zero
+ * @pre src->len must equal ceil((stop-start)/step), or function will assert
+ * @note Supports both forward (step > 0) and reverse (step < 0) slicing
  * @note Fills tensor with [start, start+step, start+2*step, ...]
- * @note Number of values written is min(tensor size, ceil((stop-start)/step))
  * @note Modifies tensor data in-place
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_tensor_arange for allocating new tensor
