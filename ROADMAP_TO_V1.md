@@ -230,19 +230,23 @@ A v1.0.0 release signals:
 
 ---
 
-### Milestone 2: Documentation & Examples (v0.4.0)
-**Duration**: 1 week
+### Milestone 2: Quick Wins & Examples (v0.4.0)
+**Duration**: 3-4 days
 **Goals**:
-- Complete API reference documentation
-- Write tutorials (getting started, MLP, optimization)
-- Add CNN and ResNet examples
-- Create benchmarks suite
+- Set up CI/CD skeleton (GitHub Actions)
+- Enhance README with badges and quick start
+- Create CHANGELOG.md
+- Add 1-2 compelling examples (CNN, ResNet)
+- Basic code documentation (comments only)
 
 **Deliverables**:
-- API documentation (Doxygen or markdown)
-- 3+ tutorials
-- 2+ new examples (CNN, ResNet)
-- Performance benchmarks
+- GitHub Actions workflow (run tests on commit)
+- Updated README with badges, quick start example
+- CHANGELOG.md tracking all releases
+- CNN example demonstrating convolutions
+- ResNet example using validated residual blocks
+
+**Note**: Comprehensive API documentation deferred to post-v1.0.0 (after API stabilization)
 
 ---
 
@@ -279,33 +283,38 @@ A v1.0.0 release signals:
 ---
 
 ### Milestone 5: v1.0.0 Release
-**Duration**: 1 week (buffer + release prep)
+**Duration**: 3-4 days (final testing + release)
 **Goals**:
-- Final testing pass
-- Documentation review
+- Final testing pass (all validation tests + examples)
+- API freeze announcement
 - Release notes finalized
 - Tag v1.0.0
 
 **Deliverables**:
 - v1.0.0 release on GitHub
-- Announcement blog post
-- Updated README with release badge
+- API stability guarantee documented
+- Updated README with v1.0.0 badge
+- Basic API comments in code
+
+**Note**: API is frozen at this point. Comprehensive docs come next.
 
 ---
 
-## Total Timeline: ~5 weeks (1.25 months)
+## Total Timeline: ~3.5 weeks (optimized)
 
-**Critical Path**:
-1. Core completeness (operations + gradients)
-2. Documentation (must have before v1.0.0)
-3. CI/CD + robustness
-4. API stabilization
-5. Release
+**Critical Path** (revised):
+1. ✅ Core completeness (operations + gradients) - 1 week
+2. Quick wins + examples (CI/CD, README, examples) - 3-4 days
+3. Robustness + quality (error handling, edge cases) - 1 week
+4. API stabilization (review, breaking changes) - 1 week
+5. v1.0.0 release (final testing) - 3-4 days
+
+**Time Saved**: 1.5 weeks by deferring comprehensive docs to post-v1.0.0
 
 **Parallel Work Opportunities**:
-- Documentation can be written while implementing operations
+- CI/CD runs continuously once set up
 - Examples can be created while writing tests
-- CI/CD setup can happen early
+- Code comments can be added during development
 
 ---
 
@@ -370,6 +379,32 @@ A v1.0.0 release signals:
 ---
 
 ## Post v1.0.0 Roadmap (v1.x)
+
+### v1.0.x: Comprehensive Documentation (Priority #1)
+**Why after v1.0.0?** API is frozen, no more rewriting docs due to breaking changes.
+
+**The Tofu Documentation Suite** (Rust mdBook style):
+
+1. **The Tofu Book** (tutorial-focused)
+   - Getting Started (installation, first program)
+   - Core Concepts (graphs, tensors, gradients)
+   - Training Your First Model (MLP on MNIST-style data)
+   - Advanced Topics (custom ops, optimization)
+   - ESP32 Deployment Guide
+
+2. **API Reference** (auto-generated)
+   - Full API documentation (Doxygen → markdown → mdBook)
+   - All operations with mathematical formulas
+   - Gradient derivations explained
+   - Memory management patterns
+
+3. **The Embedded Guide** (advanced)
+   - Memory optimization techniques
+   - Quantization strategies
+   - Real-time inference
+   - Multi-core parallelization
+
+**Tools**: mdBook, Doxygen, GitHub Pages for hosting
 
 ### v1.1.0: Performance
 - SIMD operations (AVX, NEON)
