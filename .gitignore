@@ -36,3 +36,6 @@ test_*
 test/standalone/test_validation_phase*
 test/standalone/test_gradient_*
 !test/standalone/*.c
+
+# mdBook build output
+docs/book/

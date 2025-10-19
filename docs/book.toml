@@ -12,8 +12,9 @@ create-missing = true
 [output.html]
 default-theme = "light"
 preferred-dark-theme = "navy"
-git-repository-url = "https://github.com/cakula/tofu"
+git-repository-url = "https://github.com/c2akula/tofu"
 git-repository-icon = "fa-github"
+site-url = "/tofu/"
 
 [output.html.search]
 enable = true
