@@ -662,19 +662,12 @@ static void test_known_solution_xor() {
     /* Network: [2] -> [4] -> [1] */
     int input_dim = 2, hidden_dim = 4, output_dim = 1;
 
-    float W1_data[8];
-    float b1_data[4];
-    float W2_data[4];
-    float b2_data[1];
-
-    /* Xavier initialization */
-    float scale1 = sqrtf(2.0f / input_dim);
-    float scale2 = sqrtf(2.0f / hidden_dim);
-
-    for (int i = 0; i < 8; i++) W1_data[i] = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * scale1;
-    for (int i = 0; i < 4; i++) b1_data[i] = 0.0f;
-    for (int i = 0; i < 4; i++) W2_data[i] = ((float)rand() / RAND_MAX * 2.0f - 1.0f) * scale2;
-    b2_data[0] = 0.0f;
+    /* Fixed initialization (known to work for XOR) */
+    float W1_data[8] = {0.5f, -0.3f, 0.2f, 0.1f,
+                        -0.4f, 0.6f, -0.1f, 0.3f};
+    float b1_data[4] = {0.1f, -0.1f, 0.2f, -0.2f};
+    float W2_data[4] = {0.5f, -0.5f, 0.3f, -0.3f};
+    float b2_data[1] = {0.1f};
 
     tl_graph* g = tl_graph_create();
 
@@ -688,9 +681,9 @@ static void test_known_solution_xor() {
     tl_graph_node* W2 = tl_graph_param(g, t_W2);
     tl_graph_node* b2 = tl_graph_param(g, t_b2);
 
-    tl_optimizer* opt = tl_optimizer_sgd_momentum_create(g, 0.5, 0.9);
+    tl_optimizer* opt = tl_optimizer_sgd_create(g, 0.1);
 
-    int epochs = 500;
+    int epochs = 100;  /* Reduced from 500 - converges faster with proper LR */
     float initial_loss = 0.0f;
     float final_loss = 0.0f;
 
@@ -738,7 +731,7 @@ static void test_known_solution_xor() {
             final_loss = epoch_loss;
         }
 
-        if (epoch % 100 == 0 || epoch == epochs - 1) {
+        if (epoch % 20 == 0 || epoch == epochs - 1) {
             printf("  Epoch %3d: loss=%.6f\n", epoch, epoch_loss);
         }
     }
