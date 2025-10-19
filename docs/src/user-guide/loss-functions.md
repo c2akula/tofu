@@ -462,7 +462,7 @@ Epoch 100: loss = 0.15  (well-trained)
 The gradient of cross-entropy with respect to predictions is:
 
 ```
-∂CE/∂pred = -target / pred
+∂CE/∂pred = -(1/n) * (target / pred)
 ```
 
 Key properties:

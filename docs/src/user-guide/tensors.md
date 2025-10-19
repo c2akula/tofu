@@ -73,7 +73,7 @@ Tofu supports multiple data types via the `tofu_dtype` enum:
 | `TOFU_INT64` | 64-bit signed integer | 8 bytes | Large indices |
 | `TOFU_INT8` | 8-bit signed integer | 1 byte | Quantized weights |
 | `TOFU_INT16` | 16-bit signed integer | 2 bytes | Quantized activations |
-| `TOFU_BOOL` | Boolean | 1 byte | Masks, conditions |
+| `TOFU_BOOL` | Boolean | 4 bytes | Masks, conditions |
 
 Most neural network operations use `TOFU_FLOAT` for weights and activations, while `TOFU_INT32` is common for labels and class predictions.
 
@@ -155,7 +155,7 @@ tofu_tensor_free_data_too(t);  // Frees both structure and data
 
 ```c
 float values[] = {1.0, 2.0, 3.0, 4.0};
-tofu_tensor *t = tofu_tensor_create_with_values(values, 1, (int[]){4}, TOFU_FLOAT);
+tofu_tensor *t = tofu_tensor_create_with_values(values, 1, (int[]){4});
 
 tofu_tensor_free_data_too(t);
 ```
@@ -359,7 +359,7 @@ tofu_tensor *A = tofu_tensor_create(data, 2, (int[]){2, 3}, TOFU_FLOAT);
 // [[1, 2, 3],
 //  [4, 5, 6]]
 
-tofu_tensor *AT = tofu_tensor_transpose(A, NULL);
+tofu_tensor *AT = tofu_tensor_transpose(A, NULL, NULL);
 // [[1, 4],
 //  [2, 5],
 //  [3, 6]]
@@ -604,10 +604,10 @@ tofu_tensor *t = tofu_tensor_arange(0.0, 12.0, 1.0, TOFU_FLOAT);
 tofu_tensor_reshape_src(t, 2, (int[]){3, 4});
 
 tofu_tensor *col_sums = tofu_tensor_sumreduce(t, NULL, 0);  // Sum rows
-// [12, 15, 18, 21]
+// Shape: [1, 4], values: [[12, 15, 18, 21]]
 
 tofu_tensor *row_sums = tofu_tensor_sumreduce(t, NULL, 1);  // Sum columns
-// [6, 22, 38]
+// Shape: [3, 1], values: [[6], [22], [38]]
 
 tofu_tensor_free_data_too(row_sums);
 tofu_tensor_free_data_too(col_sums);
@@ -623,7 +623,7 @@ tofu_tensor *data = tofu_tensor_arange(0.0, 12.0, 1.0, TOFU_FLOAT);
 tofu_tensor_reshape_src(data, 2, (int[]){3, 4});
 
 tofu_tensor *row_means = tofu_tensor_meanreduce(data, NULL, 1);
-// [1.5, 5.5, 9.5]
+// Shape: [3, 1], values: [[1.5], [5.5], [9.5]]
 
 tofu_tensor_free_data_too(row_means);
 tofu_tensor_free_data_too(data);
@@ -644,11 +644,11 @@ Example:
 float data[] = {3, 1, 4, 1, 5, 9, 2, 6, 5};
 tofu_tensor *t = tofu_tensor_create(data, 2, (int[]){3, 3}, TOFU_FLOAT);
 
-tofu_tensor *indices = tofu_tensor_zeros(1, (int[]){3}, TOFU_INT32);
+tofu_tensor *indices = tofu_tensor_zeros(2, (int[]){3, 1}, TOFU_INT32);
 tofu_tensor *max_vals = tofu_tensor_maxreduce(t, NULL, indices, 1);
 
-// max_vals = [4, 9, 6]
-// indices = [2, 2, 1]
+// max_vals shape: [3, 1], values: [[4], [9], [6]]
+// indices shape: [3, 1], values: [[2], [2], [1]]
 
 tofu_tensor_free_data_too(max_vals);
 tofu_tensor_free_data_too(indices);
