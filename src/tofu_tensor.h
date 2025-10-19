@@ -110,7 +110,8 @@ int tofu_tensor_isbroadcastable(const tofu_tensor *t1, const tofu_tensor *t2);
  * @pre data, dims must not be NULL; ndim > 0 and <= TOFU_MAXDIM
  * @note The tensor does NOT take ownership of the data buffer
  * @note Caller must manage data lifetime and free both tensor and data
- * @note If tensor is passed to tofu_graph_param(), the graph takes ownership
+ * @note Even when passed to tofu_graph_param(), caller still owns tensor
+ * @note Typical pattern: create tensor → graph_param → graph_free → free tensor
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_tensor_free
  * @see tofu_tensor_zeros for allocating data buffer automatically
@@ -121,7 +122,8 @@ tofu_tensor *tofu_tensor_create(void *data, int ndim, const int *dims, tofu_dtyp
  * @brief Free tensor structure (does NOT free data buffer)
  * @param t Tensor to free (can be NULL, no-op if NULL)
  * @note Does NOT free the data buffer - caller must free data separately
- * @note Do NOT call if tensor was passed to tofu_graph_param() (graph owns it)
+ * @note Safe to call even if tensor was used with tofu_graph_param()
+ * @note Call AFTER tofu_graph_free() if tensor was used with graph
  * @see tofu_tensor_free_data_too to free both tensor and data
  */
 void tofu_tensor_free(tofu_tensor *t);
@@ -131,8 +133,9 @@ void tofu_tensor_free(tofu_tensor *t);
  * @param t Tensor to free (can be NULL, no-op if NULL)
  * @note Frees both the tensor and its associated data buffer
  * @note Only use if tensor owns its data (created with tofu_tensor_zeros, etc.)
- * @note Do NOT call if tensor was created with tofu_tensor_create (caller owns data)
- * @note Do NOT call if tensor was passed to tofu_graph_param() (graph owns it)
+ * @note Do NOT use if tensor was created with tofu_tensor_create (use tofu_tensor_free)
+ * @note Safe to call if tensor was used with tofu_graph_param()
+ * @note Call AFTER tofu_graph_free() if tensor was used with graph
  */
 void tofu_tensor_free_data_too(tofu_tensor *t);
 
@@ -154,7 +157,8 @@ size_t tofu_tensor_size(tofu_tensor *t);
  * @pre dims must not be NULL; ndim > 0 and <= TOFU_MAXDIM
  * @note This allocates both tensor structure and data buffer
  * @note Caller must call tofu_tensor_free_data_too to free both
- * @note If tensor is passed to tofu_graph_param(), the graph takes ownership
+ * @note Even when passed to tofu_graph_param(), caller still owns tensor
+ * @note Call tofu_tensor_free_data_too AFTER tofu_graph_free()
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_tensor_free_data_too
  * @see tofu_tensor_create if you want to manage data buffer yourself
@@ -688,7 +692,8 @@ TOFU_CPPEND
  * @note DO NOT use compound literals like (float[]){1.0f} as they create stack memory
  * @note Number of values must match product of dims
  * @note Caller must call tofu_tensor_free_data_too to free both tensor and data
- * @note If tensor is passed to tofu_graph_param(), the graph takes ownership
+ * @note Even when passed to tofu_graph_param(), caller still owns tensor
+ * @note Call tofu_tensor_free_data_too AFTER tofu_graph_free()
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_tensor_create for wrapping existing data buffer
  * @see tofu_tensor_zeros for zero-initialized tensor

@@ -109,9 +109,10 @@ TOFU_EXPORT tofu_graph* tofu_graph_create(void);
 /**
  * @brief Free computation graph and all nodes
  * @param g Graph to free (can be NULL, no-op if NULL)
- * @note Frees all nodes, gradients, and owned tensors
- * @note Tensors passed to tofu_graph_param are freed
- * @note Tensors passed to tofu_graph_input are NOT freed (caller owns)
+ * @note Frees all graph nodes and their gradients
+ * @note Frees intermediate operation results (matmul, add, etc.)
+ * @note Does NOT free INPUT or PARAM tensors (caller owns them)
+ * @note Caller must separately free tensors passed to input/param functions
  * @note Safe to call multiple times (idempotent)
  */
 TOFU_EXPORT void tofu_graph_free(tofu_graph* g);
@@ -133,10 +134,11 @@ TOFU_EXPORT void tofu_graph_clear_ops(tofu_graph* g);
  * @brief Create input node (non-trainable data source)
  * @param g Graph to add node to (cannot be NULL)
  * @param data Input tensor data (cannot be NULL)
- * @return Pointer to newly created graph node (graph owns, freed by tofu_graph_free)
+ * @return Pointer to newly created graph node (graph owns node, caller owns tensor)
  * @pre g and data must not be NULL
  * @note Input nodes do NOT compute gradients
- * @note Graph does NOT take ownership of data tensor (caller must manage)
+ * @note IMPORTANT: Graph does NOT take ownership of data tensor
+ * @note Caller must free data tensor separately after tofu_graph_free()
  * @note Use for input data that doesn't require backpropagation
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_graph_param for trainable parameters
@@ -147,12 +149,13 @@ TOFU_EXPORT tofu_graph_node* tofu_graph_input(tofu_graph* g, tofu_tensor* data);
  * @brief Create parameter node (trainable weights/biases)
  * @param g Graph to add node to (cannot be NULL)
  * @param data Parameter tensor data (cannot be NULL)
- * @return Pointer to newly created graph node (graph owns, freed by tofu_graph_free)
+ * @return Pointer to newly created graph node (graph owns node, caller owns tensor)
  * @pre g and data must not be NULL
- * @note IMPORTANT: Graph takes ownership of data tensor
+ * @note IMPORTANT: Graph does NOT take ownership of data tensor
+ * @note Caller must free data tensor separately after tofu_graph_free()
  * @note Parameter nodes compute gradients during backward pass
  * @note Use for trainable weights, biases, etc.
- * @note data tensor will be freed when graph is freed
+ * @note Typical pattern: create tensor → param node → free tensor after graph_free
  * @note Violating preconditions triggers assert() and crashes
  * @see tofu_graph_input for non-trainable inputs
  */
