@@ -11,7 +11,7 @@ This project is a derivative work based on TensorLight, with substantial modific
 
 ## Tofu Development (2025)
 
-**[Your Name/Organization]**
+**cakula**
 
 Major contributions and enhancements:
 - **Dynamic Computation Graph**: Complete graph infrastructure implementation
