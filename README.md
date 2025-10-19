@@ -10,6 +10,17 @@
 
 **🎉 v1.0.0 Released!** First stable release with frozen public API. All `tofu_*` functions now follow strict semantic versioning guarantees. See [API_STABILITY.md](API_STABILITY.md) for details.
 
+## 📚 Documentation
+
+**Complete documentation is available at: https://c2akula.github.io/tofu/**
+
+The documentation includes:
+- **Getting Started Guide** - Installation, quick start, and core concepts
+- **User Guide** - Tensors, graphs, training loops, optimizers, and loss functions
+- **Tutorials** - Step-by-step examples for linear regression, classification, CNNs, and ResNets
+- **Best Practices** - Memory management, error handling, debugging, and performance tips
+- **API Reference** - Complete API documentation for all public functions
+
 **Key Features:**
 - 🧠 **Automatic Differentiation**: Dynamic computation graphs with backward pass
 - ✅ **Validated Operations**: All gradients numerically verified (13/13 tests passing)
@@ -50,7 +61,7 @@ tofu_graph_backward(g, output);
 tofu_graph_free(g);
 ```
 
-See [examples/](examples/) for complete training examples including MLP, ViT, and more.
+See the [online tutorials](https://c2akula.github.io/tofu/tutorials/linear-regression.html) and [examples/](examples/) for complete training examples.
 
 ## Error Handling & Limitations
 
@@ -62,7 +73,7 @@ See [examples/](examples/) for complete training examples including MLP, ViT, an
 **Known Limitations**:
 - No graceful error recovery - asserts will terminate the program
 - Limited input validation - assumes well-formed data
-- Float32 precision: ~7 decimal digits (see [VALIDATION_PLAN.md](VALIDATION_PLAN.md) for precision handling)
+- Float32 precision: ~7 decimal digits
 
 **Best Practices**:
 1. **Validate dimensions** before calling Tofu operations
