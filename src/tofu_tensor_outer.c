@@ -37,7 +37,7 @@
  * - Inputs are flattened first (doesn't preserve structure)
  * - No broadcasting (straightforward cartesian product)
  */
-tofu_tensor *tofu_tensor_outer(const tofu_tensor *src1, const tofu_tensor *src2, tofu_tensor *dst)
+TOFU_EXPORT tofu_tensor *tofu_tensor_outer(const tofu_tensor *src1, const tofu_tensor *src2, tofu_tensor *dst)
 {
     assert(src1 && src2);
     assert(src1->dtype == src2->dtype);
