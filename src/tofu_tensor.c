@@ -26,7 +26,7 @@ TOFU_EXPORT int tofu_tensor_index(const tofu_tensor *t, int *coords)
 {
     assert(t);
     assert(coords);
-#ifdef NDEBUG
+#ifndef NDEBUG
     for (int i = 0; i < t->ndim; i++)
         assert(coords[i] >= 0 && coords[i] < t->dims[i]);
 #endif

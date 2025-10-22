@@ -58,7 +58,7 @@ static inline void tofu_get_strides(tofu_tensor *t, int *strides)
     strides[t->ndim - 1] = 1;
     if (t->ndim == 1)
         return;
-    for (i = t->dims[t->ndim - 2]; i >= 0; i--)
+    for (i = t->ndim - 2; i >= 0; i--)
         strides[i] = strides[i + 1] * t->dims[i + 1];
 }
 

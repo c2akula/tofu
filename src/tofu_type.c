@@ -253,7 +253,7 @@ static int fprintf_uint64(FILE *fp, const char *fmt, void *p)
     if (!fmt)
         return fprintf(fp, dtype_fmt[TOFU_UINT64], *(uint64_t *)p);
     else
-        return fprintf(fp, fmt, *(uint16_t *)p);
+        return fprintf(fp, fmt, *(uint64_t *)p);
 }
 
 static int fprintf_uint32(FILE *fp, const char *fmt, void *p)
@@ -261,7 +261,7 @@ static int fprintf_uint32(FILE *fp, const char *fmt, void *p)
     if (!fmt)
         return fprintf(fp, dtype_fmt[TOFU_UINT32], *(uint32_t *)p);
     else
-        return fprintf(fp, fmt, *(uint16_t *)p);
+        return fprintf(fp, fmt, *(uint32_t *)p);
 }
 
 static int fprintf_uint16(FILE *fp, const char *fmt, void *p)
@@ -308,52 +308,92 @@ TOFU_EXPORT tofu_fprintf_func tofu_fprintf_getfunc(tofu_dtype dtype)
 /* tofu_cmp_func */
 static int cmp_double(void *p1, void *p2)
 {
-    return *(double *)p1 - *(double *)p2;
+    double d1 = *(double *)p1;
+    double d2 = *(double *)p2;
+    if (d1 < d2) return -1;
+    if (d1 > d2) return 1;
+    return 0;
 }
 
 static int cmp_float(void *p1, void *p2)
 {
-    return *(float *)p1 - *(float *)p2;
+    float f1 = *(float *)p1;
+    float f2 = *(float *)p2;
+    if (f1 < f2) return -1;
+    if (f1 > f2) return 1;
+    return 0;
 }
 
 static int cmp_int64(void *p1, void *p2)
 {
-    return *(int64_t *)p1 - *(int64_t *)p2;
+    int64_t i1 = *(int64_t *)p1;
+    int64_t i2 = *(int64_t *)p2;
+    if (i1 < i2) return -1;
+    if (i1 > i2) return 1;
+    return 0;
 }
 
 static int cmp_int32(void *p1, void *p2)
 {
-    return *(int32_t *)p1 - *(int32_t *)p2;
+    int32_t i1 = *(int32_t *)p1;
+    int32_t i2 = *(int32_t *)p2;
+    if (i1 < i2) return -1;
+    if (i1 > i2) return 1;
+    return 0;
 }
 
 static int cmp_int16(void *p1, void *p2)
 {
-    return *(int16_t *)p1 - *(int16_t *)p2;
+    int16_t i1 = *(int16_t *)p1;
+    int16_t i2 = *(int16_t *)p2;
+    if (i1 < i2) return -1;
+    if (i1 > i2) return 1;
+    return 0;
 }
 
 static int cmp_int8(void *p1, void *p2)
 {
-    return *(int8_t *)p1 - *(int8_t *)p2;
+    int8_t i1 = *(int8_t *)p1;
+    int8_t i2 = *(int8_t *)p2;
+    if (i1 < i2) return -1;
+    if (i1 > i2) return 1;
+    return 0;
 }
 
 static int cmp_uint64(void *p1, void *p2)
 {
-    return *(uint64_t *)p1 - *(uint64_t *)p2;
+    uint64_t u1 = *(uint64_t *)p1;
+    uint64_t u2 = *(uint64_t *)p2;
+    if (u1 < u2) return -1;
+    if (u1 > u2) return 1;
+    return 0;
 }
 
 static int cmp_uint32(void *p1, void *p2)
 {
-    return *(uint32_t *)p1 - *(uint32_t *)p2;
+    uint32_t u1 = *(uint32_t *)p1;
+    uint32_t u2 = *(uint32_t *)p2;
+    if (u1 < u2) return -1;
+    if (u1 > u2) return 1;
+    return 0;
 }
 
 static int cmp_uint16(void *p1, void *p2)
 {
-    return *(uint16_t *)p1 - *(uint16_t *)p2;
+    uint16_t u1 = *(uint16_t *)p1;
+    uint16_t u2 = *(uint16_t *)p2;
+    if (u1 < u2) return -1;
+    if (u1 > u2) return 1;
+    return 0;
 }
 
 static int cmp_uint8(void *p1, void *p2)
 {
-    return *(uint8_t *)p1 - *(uint8_t *)p2;
+    uint8_t u1 = *(uint8_t *)p1;
+    uint8_t u2 = *(uint8_t *)p2;
+    if (u1 < u2) return -1;
+    if (u1 > u2) return 1;
+    return 0;
 }
 
 static int cmp_bool(void *p1, void *p2)
